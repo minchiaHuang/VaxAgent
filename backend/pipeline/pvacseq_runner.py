@@ -1,15 +1,17 @@
 """pVACseq runner — loads neoantigen candidate predictions.
 
 In demo mode (USE_FIXTURES=true) this loads the precomputed pvacseq_candidates.json fixture.
-In live mode it would invoke pVACseq via Docker subprocess and parse the TSV output.
+In live mode it invokes pVACseq via Docker subprocess and parses the TSV output.
 The fixture path is always the safe fallback.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -68,7 +70,7 @@ def _run_pvacseq_docker(
     if result.returncode != 0:
         raise RuntimeError(f"pVACseq failed: {result.stderr[:500]}")
 
-    tsv_path = Path(output_dir) / f"{sample_name}.filtered.condensed.ranked.tsv"
+    tsv_path = Path(output_dir) / "MHC_Class_I" / f"{sample_name}.filtered.condensed.ranked.tsv"
     if not tsv_path.exists():
         raise FileNotFoundError(f"Expected output not found: {tsv_path}")
 
@@ -119,6 +121,47 @@ def _parse_pvacseq_tsv(tsv_path: str) -> list[dict]:
             except (ValueError, KeyError):
                 continue
     return candidates
+
+
+async def run_pvacseq_async(
+    job_id: str,
+    vcf_path: str,
+    hla_alleles: list[str],
+    output_dir: str,
+) -> None:
+    """Run pVACseq in a background thread and persist results + job status to SQLite.
+
+    Imports db helpers lazily to avoid circular imports at module load time.
+    """
+    from db.database import update_job
+
+    def _now() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    result_path = str(Path(output_dir) / "candidates.json")
+
+    await update_job(job_id, _now(), status="running", progress_pct=5)
+
+    try:
+        candidates = await asyncio.to_thread(
+            _run_pvacseq_docker, vcf_path, job_id, hla_alleles, output_dir
+        )
+        await update_job(job_id, _now(), progress_pct=90)
+
+        ranked = rank_candidates(candidates, top_n=10)
+        Path(result_path).write_text(json.dumps(ranked, indent=2))
+
+        await update_job(
+            job_id, _now(), status="complete", progress_pct=100, result_path=result_path
+        )
+    except Exception as exc:
+        await update_job(job_id, _now(), status="failed", error_msg=str(exc)[:500])
+
+
+def load_candidates_from_job(result_path: str) -> list[dict]:
+    """Load ranked candidates from a completed pVACseq job result file."""
+    with open(result_path) as f:
+        return json.load(f)
 
 
 def rank_candidates(candidates: list[dict], top_n: int = 10) -> list[dict]:

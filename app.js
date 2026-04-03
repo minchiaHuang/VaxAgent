@@ -212,8 +212,27 @@ const elements = {
   hlaAllelesInput: document.getElementById("hla-alleles-input"),
   analyseButton: document.getElementById("analyse-button"),
   uploadStatus: document.getElementById("upload-status"),
-  fileLabelText: document.getElementById("file-label-text")
+  fileLabelText: document.getElementById("file-label-text"),
+  modeQuickBtn: document.getElementById("mode-quick"),
+  modeFullBtn: document.getElementById("mode-full"),
+  modeDescription: document.getElementById("mode-description"),
+  jobProgressArea: document.getElementById("job-progress-area"),
+  jobProgressLabel: document.getElementById("job-progress-label"),
+  jobElapsed: document.getElementById("job-elapsed"),
+  progressBar: document.getElementById("progress-bar"),
+  jobProgressNote: document.getElementById("job-progress-note")
 };
+
+const MODE_DESCRIPTIONS = {
+  quick:
+    "Upload a <code>.vcf</code> or <code>.vcf.gz</code> tumor mutation file. The variant summary will reflect your file. Neoantigen candidate ranking uses the HCC1395 benchmark fixture — live pVACseq is outside this demo scope.",
+  full:
+    "Upload a <code>.vcf</code> or <code>.vcf.gz</code> file and provide HLA alleles. pVACseq will run inside Docker and produce real neoantigen predictions. This takes <strong>30–60 minutes</strong> — Docker must be installed and running."
+};
+
+let _analysisMode = "quick";
+let _jobPollInterval = null;
+let _jobStartTime = null;
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-US").format(value);
@@ -677,12 +696,172 @@ function runBackendPipelineWithUrl(wsUrl) {
   });
 }
 
+async function checkDockerAvailability() {
+  try {
+    const res = await fetch(`${API_ORIGIN}/health`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.docker === true;
+  } catch {
+    return false;
+  }
+}
+
+function setAnalysisMode(mode) {
+  _analysisMode = mode;
+  elements.modeQuickBtn.classList.toggle("is-selected", mode === "quick");
+  elements.modeFullBtn.classList.toggle("is-selected", mode === "full");
+  elements.modeDescription.innerHTML = MODE_DESCRIPTIONS[mode];
+  elements.hlaAllelesInput.required = mode === "full";
+  const placeholder =
+    mode === "full"
+      ? "HLA alleles (required) — e.g. HLA-A*02:01, HLA-B*07:02"
+      : "HLA alleles (optional) — e.g. HLA-A*02:01, HLA-B*07:02";
+  elements.hlaAllelesInput.placeholder = placeholder;
+  setUploadStatus("");
+}
+
+function setProgressVisible(visible) {
+  elements.jobProgressArea.hidden = !visible;
+}
+
+function updateProgressBar(pct, label) {
+  elements.progressBar.style.width = `${pct}%`;
+  if (label) elements.jobProgressLabel.textContent = label;
+}
+
+function startElapsedTimer() {
+  _jobStartTime = Date.now();
+  const tick = () => {
+    if (!_jobStartTime) return;
+    const elapsed = Math.floor((Date.now() - _jobStartTime) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    elements.jobElapsed.textContent = `${mins}m ${secs}s elapsed`;
+  };
+  tick();
+  return window.setInterval(tick, 1000);
+}
+
+function stopPolling() {
+  if (_jobPollInterval) {
+    window.clearInterval(_jobPollInterval);
+    _jobPollInterval = null;
+  }
+  _jobStartTime = null;
+}
+
+async function submitFullPipeline() {
+  const file = elements.vcfFileInput.files[0];
+  if (!file) return;
+
+  const hla = elements.hlaAllelesInput.value.trim();
+  if (!hla) {
+    setUploadStatus("HLA alleles are required for full pVACseq analysis.", true);
+    return;
+  }
+
+  if (state.loading) return;
+
+  resetRunState();
+  state.loading = true;
+  elements.analyseButton.disabled = true;
+  elements.loadButton.disabled = true;
+  elements.analyseButton.textContent = "Submitting...";
+  setUploadStatus("Uploading VCF and submitting pVACseq job...");
+  setProgressVisible(true);
+  updateProgressBar(2, "Uploading file...");
+  updateStatus("running", "Submitting pVACseq job. This will take 30–60 minutes.");
+  renderAll();
+
+  const formData = new FormData();
+  formData.append("vcf_file", file);
+  formData.append("hla_alleles", hla);
+
+  let jobId = null;
+  try {
+    const res = await fetch(`${API_ORIGIN}/api/jobs/pvacseq`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Submission failed (HTTP ${res.status})`);
+    }
+    const result = await res.json();
+    jobId = result.job_id;
+  } catch (err) {
+    setUploadStatus(`Submission error: ${err.message}`, true);
+    setProgressVisible(false);
+    state.loading = false;
+    elements.analyseButton.disabled = false;
+    elements.analyseButton.textContent = "Analyse My File";
+    elements.loadButton.disabled = false;
+    updateStatus("idle", state.statusMessage);
+    return;
+  }
+
+  elements.analyseButton.textContent = "pVACseq running...";
+  setUploadStatus(`Job submitted (ID: ${jobId}). Polling for completion...`);
+  updateProgressBar(5, "pVACseq queued...");
+
+  const elapsedTimer = startElapsedTimer();
+
+  _jobPollInterval = window.setInterval(async () => {
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/jobs/${jobId}`);
+      if (!res.ok) return;
+      const job = await res.json();
+
+      updateProgressBar(job.progress_pct || 5, `pVACseq ${job.status}...`);
+
+      if (job.status === "complete") {
+        stopPolling();
+        window.clearInterval(elapsedTimer);
+        updateProgressBar(100, "pVACseq complete. Loading results...");
+        setUploadStatus(`pVACseq complete for ${file.name}. Running analysis pipeline...`);
+
+        const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?job_id=${jobId}`;
+        const ok = await runBackendPipelineWithUrl(wsUrl);
+        setProgressVisible(false);
+        if (!ok) {
+          setUploadStatus("Pipeline failed after pVACseq. See console for details.", true);
+          applyFallbackRun();
+        } else {
+          setUploadStatus(`Full pVACseq analysis complete for ${file.name}.`);
+        }
+        state.loading = false;
+        elements.analyseButton.disabled = false;
+        elements.analyseButton.textContent = "Analyse My File";
+        elements.loadButton.disabled = false;
+
+      } else if (job.status === "failed") {
+        stopPolling();
+        window.clearInterval(elapsedTimer);
+        setProgressVisible(false);
+        setUploadStatus(`pVACseq failed: ${job.error_msg || "unknown error"}`, true);
+        state.loading = false;
+        elements.analyseButton.disabled = false;
+        elements.analyseButton.textContent = "Analyse My File";
+        elements.loadButton.disabled = false;
+        updateStatus("idle", state.statusMessage);
+      }
+    } catch {
+      // transient fetch error — keep polling
+    }
+  }, 30000);
+}
+
 function setUploadStatus(message, isError = false) {
   elements.uploadStatus.textContent = message;
   elements.uploadStatus.className = `upload-status ${isError ? "upload-status-error" : message ? "upload-status-info" : ""}`;
 }
 
 async function uploadAndRun() {
+  if (_analysisMode === "full") {
+    return submitFullPipeline();
+  }
+
   const file = elements.vcfFileInput.files[0];
   if (!file) {
     return;
@@ -791,6 +970,22 @@ elements.vcfFileInput.addEventListener("change", () => {
 });
 
 elements.analyseButton.addEventListener("click", uploadAndRun);
+
+elements.modeQuickBtn.addEventListener("click", () => setAnalysisMode("quick"));
+elements.modeFullBtn.addEventListener("click", () => {
+  if (!elements.modeFullBtn.disabled) setAnalysisMode("full");
+});
+
+// Check Docker availability and enable Full analysis mode if available
+checkDockerAvailability().then((dockerOk) => {
+  if (dockerOk) {
+    elements.modeFullBtn.disabled = false;
+    elements.modeFullBtn.title = "";
+  } else {
+    elements.modeFullBtn.disabled = true;
+    elements.modeFullBtn.title = "Docker is not available on this machine — Full analysis requires Docker";
+  }
+});
 
 updateStatus("idle", state.statusMessage);
 renderAll();

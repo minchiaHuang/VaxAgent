@@ -47,10 +47,20 @@
           </div>
           <span class="upload-badge">Research-use only</span>
         </div>
-        <p class="upload-description">
-          Upload a <code>.vcf</code> or <code>.vcf.gz</code> tumor mutation file. The variant summary
-          will reflect your file. Neoantigen candidate ranking uses the HCC1395 benchmark fixture
-          — live pVACseq prediction takes 30–60 minutes and is outside this demo scope.
+        <div class="mode-toggle" role="group" aria-label="Analysis mode">
+          <button id="mode-quick" class="mode-toggle-btn is-selected" data-mode="quick">
+            Quick demo
+            <span class="mode-toggle-sub">Fixture candidates · instant</span>
+          </button>
+          <button id="mode-full" class="mode-toggle-btn" data-mode="full" disabled>
+            Full analysis
+            <span class="mode-toggle-sub">Live pVACseq · 30–60 min</span>
+          </button>
+        </div>
+        <p id="mode-description" class="upload-description">
+          Upload a <code>.vcf</code> or <code>.vcf.gz</code> tumor mutation file. The variant
+          summary will reflect your file. Neoantigen candidate ranking uses the HCC1395
+          benchmark fixture — live pVACseq is outside this demo scope.
         </p>
         <div class="upload-fields">
           <label class="file-label">
@@ -61,9 +71,22 @@
             type="text"
             id="hla-alleles-input"
             class="hla-input"
-            placeholder="HLA alleles (optional) — e.g. HLA-A*02:01, HLA-B*07:02"
+            placeholder="HLA alleles — e.g. HLA-A*02:01, HLA-B*07:02"
           />
           <button id="analyse-button" class="primary-button" disabled>Analyse My File</button>
+        </div>
+        <div id="job-progress-area" class="job-progress-area" hidden>
+          <div class="job-progress-header">
+            <span id="job-progress-label" class="job-progress-label">Running pVACseq...</span>
+            <span id="job-elapsed" class="job-elapsed"></span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+          </div>
+          <p id="job-progress-note" class="job-progress-note">
+            pVACseq is running inside Docker. This takes 30–60 minutes on a typical dataset.
+            You can leave this page open and return later.
+          </p>
         </div>
         <p id="upload-status" class="upload-status"></p>
       </section>

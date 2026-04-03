@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -30,12 +31,22 @@ from fastapi.responses import FileResponse, JSONResponse
 load_dotenv()
 
 from agent.orchestrator import explain_step
-from db.database import get_run, init_db, list_runs, save_run
+from db.database import create_job, get_job, get_run, init_db, list_jobs, list_runs, save_run, update_job
 from pipeline.esmfold_client import enrich_candidates_with_structure
 from pipeline.mrna_designer import design_construct
-from pipeline.pvacseq_runner import load_candidates_fixture, rank_candidates
+from pipeline.pvacseq_runner import (
+    load_candidates_fixture,
+    load_candidates_from_job,
+    rank_candidates,
+    run_pvacseq_async,
+)
 from pipeline.report_generator import generate_pdf
 from pipeline.vcf_parser import load_variant_stats_fixture, parse_vcf_live_force
+
+JOBS_DIR = Path(__file__).parent / "jobs"
+JOBS_DIR.mkdir(exist_ok=True)
+
+_docker_available: bool = False
 
 # In-memory cache for uploaded VCF parse results keyed by file_id.
 # Entries are evicted after 30 minutes via a background task.
@@ -60,6 +71,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup() -> None:
+    global _docker_available
+    _docker_available = shutil.which("docker") is not None
     await init_db()
     asyncio.create_task(_evict_upload_cache())
 
@@ -81,7 +94,11 @@ async def _evict_upload_cache() -> None:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "vaxagent-backend"}
+    return {
+        "status": "ok",
+        "service": "vaxagent-backend",
+        "docker": _docker_available,
+    }
 
 
 @app.get("/api/runs")
@@ -159,6 +176,72 @@ async def upload_vcf(
     return JSONResponse({"file_id": file_id, "variant_stats": variant_stats})
 
 
+@app.post("/api/jobs/pvacseq")
+async def submit_pvacseq_job(
+    vcf_file: UploadFile = File(...),
+    hla_alleles: str = Form(...),
+) -> JSONResponse:
+    """Accept a VCF upload and HLA alleles, start a real pVACseq Docker job."""
+    if not _docker_available:
+        return JSONResponse(
+            {"error": "Docker is not available on this machine. pVACseq requires Docker."},
+            status_code=503,
+        )
+
+    filename = vcf_file.filename or ""
+    if not (filename.endswith(".vcf") or filename.endswith(".vcf.gz")):
+        return JSONResponse(
+            {"error": "Only .vcf and .vcf.gz files are accepted."},
+            status_code=400,
+        )
+
+    alleles = [a.strip() for a in hla_alleles.split(",") if a.strip()]
+    if not alleles:
+        return JSONResponse(
+            {"error": "At least one HLA allele is required for pVACseq."},
+            status_code=400,
+        )
+
+    job_id = uuid.uuid4().hex[:8]
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    suffix = ".vcf.gz" if filename.endswith(".vcf.gz") else ".vcf"
+    vcf_path = str(job_dir / f"input{suffix}")
+    with open(vcf_path, "wb") as f:
+        f.write(await vcf_file.read())
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    await create_job(job_id, created_at, filename, alleles)
+    asyncio.create_task(
+        run_pvacseq_async(job_id, vcf_path, alleles, str(job_dir))
+    )
+
+    return JSONResponse({"job_id": job_id, "status": "queued"})
+
+
+@app.get("/api/jobs")
+async def get_jobs_list() -> JSONResponse:
+    jobs = await list_jobs()
+    return JSONResponse({"jobs": jobs})
+
+
+@app.get("/api/jobs/{job_id}")
+async def get_job_status(job_id: str) -> JSONResponse:
+    job = await get_job(job_id)
+    if job is None:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+    return JSONResponse({
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "progress_pct": job["progress_pct"],
+        "vcf_filename": job["vcf_filename"],
+        "created_at": job["created_at"],
+        "updated_at": job["updated_at"],
+        "error_msg": job["error_msg"],
+    })
+
+
 # ---------------------------------------------------------------------------
 # WebSocket pipeline
 # ---------------------------------------------------------------------------
@@ -181,9 +264,27 @@ async def pipeline_ws(
     websocket: WebSocket,
     dataset_id: str = "hcc1395",
     file_id: str = "",
+    job_id: str = "",
 ) -> None:
     await websocket.accept()
     run_id = uuid.uuid4().hex[:8]
+
+    # Resolve real pVACseq job candidates if job_id provided
+    job_candidates: list[dict] | None = None
+    if job_id:
+        job = await get_job(job_id)
+        if job is None:
+            await _send(websocket, "error", "error",
+                        explanation=f"Job {job_id} not found.", run_id=run_id)
+            await websocket.close()
+            return
+        if job["status"] != "complete":
+            await _send(websocket, "error", "error",
+                        explanation=f"Job {job_id} is not complete yet (status: {job['status']}).",
+                        run_id=run_id)
+            await websocket.close()
+            return
+        job_candidates = load_candidates_from_job(job["result_path"])
 
     try:
         # ── Step 1: Load dataset ──────────────────────────────────────────
@@ -208,19 +309,27 @@ async def pipeline_ws(
         await _send(websocket, "pvacseq", "running", run_id=run_id)
         await asyncio.sleep(0.5)
 
-        raw_candidates = load_candidates_fixture(dataset_id)
-        pvacseq_context = {
-            "total_evaluated": variant_stats.get("stats", {}).get("initial_predictions", 322),
-            "passing_threshold": variant_stats.get("stats", {}).get("high_confidence_candidates", 78),
-        }
-        if file_id and file_id in _upload_cache:
+        if job_candidates is not None:
+            raw_candidates = job_candidates
             explanation = (
-                "Neoantigen binding predictions use the HCC1395 benchmark shortlist — "
-                "running live pVACseq on an uploaded file takes 30–60 minutes and is outside "
-                "the scope of this demo. The variant summary above reflects your file."
+                f"Ran live pVACseq on your uploaded VCF file. "
+                f"{len(raw_candidates)} candidates passed the IC50 binding threshold of 500 nM "
+                f"and are ready for ranking."
             )
         else:
-            explanation = await explain_step("pvacseq", pvacseq_context)
+            raw_candidates = load_candidates_fixture(dataset_id)
+            pvacseq_context = {
+                "total_evaluated": variant_stats.get("stats", {}).get("initial_predictions", 322),
+                "passing_threshold": variant_stats.get("stats", {}).get("high_confidence_candidates", 78),
+            }
+            if file_id and file_id in _upload_cache:
+                explanation = (
+                    "Neoantigen binding predictions use the HCC1395 benchmark shortlist — "
+                    "running live pVACseq on an uploaded file takes 30–60 minutes and is outside "
+                    "the scope of this demo. The variant summary above reflects your file."
+                )
+            else:
+                explanation = await explain_step("pvacseq", pvacseq_context)
         await _send(
             websocket,
             "pvacseq",
