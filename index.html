@@ -39,6 +39,35 @@
         </div>
       </header>
 
+      <section class="upload-panel panel">
+        <div class="upload-panel-header">
+          <div>
+            <p class="section-kicker">Your Data</p>
+            <h2>Analyse your own VCF file</h2>
+          </div>
+          <span class="upload-badge">Research-use only</span>
+        </div>
+        <p class="upload-description">
+          Upload a <code>.vcf</code> or <code>.vcf.gz</code> tumor mutation file. The variant summary
+          will reflect your file. Neoantigen candidate ranking uses the HCC1395 benchmark fixture
+          — live pVACseq prediction takes 30–60 minutes and is outside this demo scope.
+        </p>
+        <div class="upload-fields">
+          <label class="file-label">
+            <span class="file-label-text" id="file-label-text">Choose .vcf or .vcf.gz file</span>
+            <input type="file" id="vcf-file-input" accept=".vcf,.vcf.gz" />
+          </label>
+          <input
+            type="text"
+            id="hla-alleles-input"
+            class="hla-input"
+            placeholder="HLA alleles (optional) — e.g. HLA-A*02:01, HLA-B*07:02"
+          />
+          <button id="analyse-button" class="primary-button" disabled>Analyse My File</button>
+        </div>
+        <p id="upload-status" class="upload-status"></p>
+      </section>
+
       <main class="dashboard">
         <section class="panel stepper-panel">
           <div class="section-heading">

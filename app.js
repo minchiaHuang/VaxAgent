@@ -207,7 +207,12 @@ const elements = {
   blueprintCard: document.getElementById("blueprint-card"),
   limitationsList: document.getElementById("limitations-list"),
   modeChip: document.getElementById("mode-chip"),
-  pipelineStatus: document.getElementById("pipeline-status")
+  pipelineStatus: document.getElementById("pipeline-status"),
+  vcfFileInput: document.getElementById("vcf-file-input"),
+  hlaAllelesInput: document.getElementById("hla-alleles-input"),
+  analyseButton: document.getElementById("analyse-button"),
+  uploadStatus: document.getElementById("upload-status"),
+  fileLabelText: document.getElementById("file-label-text")
 };
 
 function formatNumber(value) {
@@ -593,7 +598,7 @@ function exportBrief() {
   URL.revokeObjectURL(url);
 }
 
-function runBackendPipeline() {
+function runBackendPipelineWithUrl(wsUrl) {
   return new Promise((resolve) => {
     let settled = false;
     let sawAnyMessage = false;
@@ -610,7 +615,7 @@ function runBackendPipeline() {
     }, 8000);
 
     try {
-      state.ws = new WebSocket(WS_URL);
+      state.ws = new WebSocket(wsUrl);
     } catch (_error) {
       window.clearTimeout(timeout);
       resolve(false);
@@ -672,6 +677,82 @@ function runBackendPipeline() {
   });
 }
 
+function setUploadStatus(message, isError = false) {
+  elements.uploadStatus.textContent = message;
+  elements.uploadStatus.className = `upload-status ${isError ? "upload-status-error" : message ? "upload-status-info" : ""}`;
+}
+
+async function uploadAndRun() {
+  const file = elements.vcfFileInput.files[0];
+  if (!file) {
+    return;
+  }
+
+  if (state.loading) {
+    return;
+  }
+
+  resetRunState();
+  state.loading = true;
+  elements.analyseButton.disabled = true;
+  elements.loadButton.disabled = true;
+  elements.analyseButton.textContent = "Uploading...";
+  setUploadStatus("Uploading and parsing your VCF file...");
+  updateStatus(
+    "running",
+    "Uploading your VCF file and parsing variant statistics."
+  );
+  renderAll();
+
+  const formData = new FormData();
+  formData.append("vcf_file", file);
+  const hla = elements.hlaAllelesInput.value.trim();
+  if (hla) {
+    formData.append("hla_alleles", hla);
+  }
+
+  let fileId = null;
+  try {
+    const response = await fetch(`${API_ORIGIN}/api/upload`, {
+      method: "POST",
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Upload failed (HTTP ${response.status})`);
+    }
+    const result = await response.json();
+    fileId = result.file_id;
+    setUploadStatus(`Parsed ${file.name}. Running analysis pipeline...`);
+    elements.analyseButton.textContent = "Pipeline running...";
+  } catch (err) {
+    setUploadStatus(`Upload error: ${err.message}`, true);
+    state.loading = false;
+    elements.analyseButton.disabled = false;
+    elements.analyseButton.textContent = "Analyse My File";
+    elements.loadButton.disabled = false;
+    updateStatus("idle", state.statusMessage);
+    return;
+  }
+
+  const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?file_id=${fileId}`;
+  const backendSucceeded = await runBackendPipelineWithUrl(wsUrl);
+
+  if (!backendSucceeded) {
+    setUploadStatus("Pipeline failed after upload. The benchmark fixture was loaded as a fallback.", true);
+    applyFallbackRun();
+  } else {
+    setUploadStatus(`Analysis complete for ${file.name}.`);
+  }
+
+  elements.analyseButton.disabled = false;
+  elements.analyseButton.textContent = "Analyse My File";
+}
+
+function runBackendPipeline() {
+  return runBackendPipelineWithUrl(WS_URL);
+}
+
 async function loadDemo() {
   if (state.loading) {
     return;
@@ -696,6 +777,20 @@ async function loadDemo() {
 
 elements.loadButton.addEventListener("click", loadDemo);
 elements.exportButton.addEventListener("click", exportBrief);
+
+elements.vcfFileInput.addEventListener("change", () => {
+  const file = elements.vcfFileInput.files[0];
+  if (file) {
+    elements.fileLabelText.textContent = file.name;
+    elements.analyseButton.disabled = false;
+    setUploadStatus("");
+  } else {
+    elements.fileLabelText.textContent = "Choose .vcf or .vcf.gz file";
+    elements.analyseButton.disabled = true;
+  }
+});
+
+elements.analyseButton.addEventListener("click", uploadAndRun);
 
 updateStatus("idle", state.statusMessage);
 renderAll();

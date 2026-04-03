@@ -17,12 +17,13 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -34,7 +35,11 @@ from pipeline.esmfold_client import enrich_candidates_with_structure
 from pipeline.mrna_designer import design_construct
 from pipeline.pvacseq_runner import load_candidates_fixture, rank_candidates
 from pipeline.report_generator import generate_pdf
-from pipeline.vcf_parser import load_variant_stats_fixture
+from pipeline.vcf_parser import load_variant_stats_fixture, parse_vcf_live_force
+
+# In-memory cache for uploaded VCF parse results keyed by file_id.
+# Entries are evicted after 30 minutes via a background task.
+_upload_cache: dict[str, dict] = {}
 
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
 
@@ -56,6 +61,17 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup() -> None:
     await init_db()
+    asyncio.create_task(_evict_upload_cache())
+
+
+async def _evict_upload_cache() -> None:
+    """Remove upload cache entries older than 30 minutes every 5 minutes."""
+    while True:
+        await asyncio.sleep(300)
+        cutoff = datetime.now(timezone.utc).timestamp() - 1800
+        stale = [k for k, v in _upload_cache.items() if v.get("_uploaded_at", 0) < cutoff]
+        for k in stale:
+            _upload_cache.pop(k, None)
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +115,50 @@ async def download_report(run_id: str) -> FileResponse:
     )
 
 
+@app.post("/api/upload")
+async def upload_vcf(
+    vcf_file: UploadFile = File(...),
+    hla_alleles: str = Form(""),
+) -> JSONResponse:
+    """Accept a VCF or VCF.gz upload, parse real variant statistics, and
+    return a file_id that the WebSocket pipeline can use for Step 1."""
+
+    filename = vcf_file.filename or ""
+    if not (filename.endswith(".vcf") or filename.endswith(".vcf.gz")):
+        return JSONResponse(
+            {"error": "Only .vcf and .vcf.gz files are accepted."},
+            status_code=400,
+        )
+
+    suffix = ".vcf.gz" if filename.endswith(".vcf.gz") else ".vcf"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(await vcf_file.read())
+        tmp_path = tmp.name
+
+    try:
+        variant_stats = parse_vcf_live_force(tmp_path)
+    except Exception as exc:
+        Path(tmp_path).unlink(missing_ok=True)
+        return JSONResponse({"error": f"VCF parse failed: {exc}"}, status_code=422)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    alleles = [a.strip() for a in hla_alleles.split(",") if a.strip()]
+    if alleles:
+        variant_stats["hla_alleles"] = alleles
+
+    variant_stats["dataset_name"] = filename
+    variant_stats["source"] = "User-uploaded VCF file."
+
+    file_id = uuid.uuid4().hex[:8]
+    _upload_cache[file_id] = {
+        **variant_stats,
+        "_uploaded_at": datetime.now(timezone.utc).timestamp(),
+    }
+
+    return JSONResponse({"file_id": file_id, "variant_stats": variant_stats})
+
+
 # ---------------------------------------------------------------------------
 # WebSocket pipeline
 # ---------------------------------------------------------------------------
@@ -117,7 +177,11 @@ async def _send(ws: WebSocket, step: str, status: str, explanation: str = "", da
 
 
 @app.websocket("/ws/pipeline")
-async def pipeline_ws(websocket: WebSocket, dataset_id: str = "hcc1395") -> None:
+async def pipeline_ws(
+    websocket: WebSocket,
+    dataset_id: str = "hcc1395",
+    file_id: str = "",
+) -> None:
     await websocket.accept()
     run_id = uuid.uuid4().hex[:8]
 
@@ -126,7 +190,10 @@ async def pipeline_ws(websocket: WebSocket, dataset_id: str = "hcc1395") -> None
         await _send(websocket, "load_dataset", "running", run_id=run_id)
         await asyncio.sleep(0.3)
 
-        variant_stats = load_variant_stats_fixture(dataset_id)
+        if file_id and file_id in _upload_cache:
+            variant_stats = {k: v for k, v in _upload_cache[file_id].items() if not k.startswith("_")}
+        else:
+            variant_stats = load_variant_stats_fixture(dataset_id)
         explanation = await explain_step("load_dataset", variant_stats)
         await _send(
             websocket,
@@ -146,7 +213,14 @@ async def pipeline_ws(websocket: WebSocket, dataset_id: str = "hcc1395") -> None
             "total_evaluated": variant_stats.get("stats", {}).get("initial_predictions", 322),
             "passing_threshold": variant_stats.get("stats", {}).get("high_confidence_candidates", 78),
         }
-        explanation = await explain_step("pvacseq", pvacseq_context)
+        if file_id and file_id in _upload_cache:
+            explanation = (
+                "Neoantigen binding predictions use the HCC1395 benchmark shortlist — "
+                "running live pVACseq on an uploaded file takes 30–60 minutes and is outside "
+                "the scope of this demo. The variant summary above reflects your file."
+            )
+        else:
+            explanation = await explain_step("pvacseq", pvacseq_context)
         await _send(
             websocket,
             "pvacseq",

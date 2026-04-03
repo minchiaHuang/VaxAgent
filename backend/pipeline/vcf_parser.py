@@ -35,6 +35,16 @@ def parse_vcf(vcf_path: str) -> dict:
         return load_variant_stats_fixture()
 
 
+def parse_vcf_live_force(vcf_path: str) -> dict:
+    """Parse a VCF file unconditionally, ignoring the USE_FIXTURES env var.
+
+    Used by the upload endpoint so that real files are always parsed even
+    when the rest of the pipeline is running in fixture mode.
+    Raises on parse failure so the caller can return an HTTP error.
+    """
+    return _parse_vcf_live(vcf_path)
+
+
 def _parse_vcf_live(vcf_path: str) -> dict:
     opener = gzip.open if vcf_path.endswith(".gz") else open
 

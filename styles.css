@@ -472,6 +472,122 @@ h2 {
   }
 }
 
+/* ── Upload panel ─────────────────────────────────────────────────────── */
+
+.upload-panel {
+  margin-top: 18px;
+}
+
+.upload-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.upload-badge {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.upload-description {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 18px;
+}
+
+.upload-description code {
+  background: rgba(27, 26, 22, 0.08);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.88em;
+}
+
+.upload-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 14px;
+  border: 1px dashed rgba(27, 26, 22, 0.28);
+  background: rgba(255, 255, 255, 0.48);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.file-label:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.file-label input[type="file"] {
+  display: none;
+}
+
+.file-label-text {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hla-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.hla-input:focus {
+  border-color: var(--accent-2);
+}
+
+.hla-input::placeholder {
+  color: var(--muted);
+}
+
+.upload-status {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+  min-height: 1.2em;
+  line-height: 1.5;
+}
+
+.upload-status-info {
+  color: var(--accent-2);
+}
+
+.upload-status-error {
+  color: var(--accent);
+}
+
+/* ── Responsive: upload panel ─────────────────────────────────────────── */
+
 @media (max-width: 980px) {
   .hero,
   .explanation-layout,
@@ -503,5 +619,18 @@ h2 {
 
   .candidate-card {
     grid-template-columns: 1fr;
+  }
+
+  .upload-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-label-text {
+    max-width: 100%;
+  }
+
+  .hla-input {
+    min-width: unset;
   }
 }

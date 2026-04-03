@@ -128,18 +128,18 @@ This project is `Handoff Ready` when:
 
 ## Real Vs Stubbed
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Frontend UI | Real | one-page demo app |
-| Benchmark fixture data | Real | HCC1395 benchmark fixture |
-| Candidate ranking | Real | composite IC50 + expression + VAF + fold-change score |
-| Plain-English explanations | Real with fallback | Claude if available, static fallback otherwise |
-| mRNA blueprint preview | Real research preview | deterministic construct generation |
-| PDF report | Real | backend report generation |
-| SQLite run history | Real | saved by backend |
-| pVACseq live execution | Stubbed for MVP | fixture-first |
-| VCF live parsing | Stubbed for MVP | fixture-first |
-| ESMFold live enrichment | Optional / fallback | heuristic-safe for demo stability |
+| Component                  | Status                | Notes                                                 |
+| -------------------------- | --------------------- | ----------------------------------------------------- |
+| Frontend UI                | Real                  | one-page demo app                                     |
+| Benchmark fixture data     | Real                  | HCC1395 benchmark fixture                             |
+| Candidate ranking          | Real                  | composite IC50 + expression + VAF + fold-change score |
+| Plain-English explanations | Real with fallback    | Claude if available, static fallback otherwise        |
+| mRNA blueprint preview     | Real research preview | deterministic construct generation                    |
+| PDF report                 | Real                  | backend report generation                             |
+| SQLite run history         | Real                  | saved by backend                                      |
+| pVACseq live execution     | Stubbed for MVP       | fixture-first                                         |
+| VCF live parsing           | Stubbed for MVP       | fixture-first                                         |
+| ESMFold live enrichment    | Optional / fallback   | heuristic-safe for demo stability                     |
 
 ## Rule
 
