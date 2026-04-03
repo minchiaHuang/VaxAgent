@@ -2,16 +2,30 @@
 
 FastAPI backend for the VaxAgent research copilot.
 
-## Quick start
+This document covers backend setup only. The repo-level runbook and success criteria live in the top-level [`README.md`](../README.md).
+
+## Quick Start
 
 ```bash
 cd backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # edit ANTHROPIC_API_KEY if you have one
-uvicorn main:app --reload --port 8000
+cp .env.example .env
+uvicorn main:app --port 8000
 ```
 
 Open `http://localhost:8000/health` to verify the server is running.
+
+## Required Verification
+
+After startup, the backend path should satisfy all of these:
+
+1. `curl http://127.0.0.1:8000/health` returns `{"status":"ok",...}`
+2. the frontend shows `Backend connected` after `Load Benchmark Case`
+3. `/ws/pipeline` completes through `pipeline_complete`
+4. `/api/runs` shows the new run
+5. `/api/runs/{run_id}/report` returns a PDF
 
 ## WebSocket demo
 

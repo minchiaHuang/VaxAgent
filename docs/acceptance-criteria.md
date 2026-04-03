@@ -1,29 +1,59 @@
 # Acceptance Criteria
 
-## Must Have
+## Done Definition
 
-- one benchmark dataset loads without user setup
+The MVP is done only when it is `Handoff Ready`, not just when one local demo happens to work once.
+
+## Product Success
+
+- one benchmark dataset loads successfully
 - mutation summary is visible
 - ranked neoantigen candidates are visible
 - a plain-English explanation panel is visible
 - mRNA blueprint preview is visible
 - one export action works reliably
 - the app clearly states research-use and human-in-the-loop limitations
-- the happy path completes without crash
+- no screen implies clinical or treatment recommendation use
 
-## Demo Criteria
+## Demo Success
 
-- a first-time viewer can follow the flow in under 90 seconds
-- the UI answers "what happened?" and "why does it matter?" in each major section
-- the top candidate rationale is understandable to a non-specialist viewer
-- no part of the UI implies clinical-grade recommendations
+- the happy path can be explained in 60 to 90 seconds
+- a non-specialist viewer can understand what happened and why it matters
+- the top candidate rationale is understandable without reading raw pipeline files
+- the flow is stable and repeatable
 
-## Engineering Criteria
+## Verification Paths
 
-- no network dependency is required for the happy path
-- the dataset and outputs are deterministic
-- no live bioinformatics tooling is required at demo time
-- failure-prone integrations are stubbed or removed
+### Frontend fallback must pass
+
+- app opens without backend setup
+- clicking `Load Benchmark Case` shows `Fallback fixture`
+- summary, candidates, explanation, blueprint, and export all work
+- export downloads a markdown brief
+
+### Backend live path must pass
+
+- backend dependencies install successfully
+- `uvicorn main:app --port 8000` starts successfully
+- `GET /health` returns `ok`
+- frontend shows `Backend connected`
+- the pipeline completes:
+  - `load_dataset`
+  - `pvacseq`
+  - `ranking`
+  - `esmfold`
+  - `mrna_design`
+  - `report`
+  - `pipeline_complete`
+- PDF report export works
+- `GET /api/runs` contains the new run
+
+## Handoff Success
+
+- README is sufficient as the primary runbook
+- kept docs do not contradict one another
+- duplicate or outdated docs have been removed
+- runtime artifacts are not treated as handoff assets
 
 ## Release Rule
 

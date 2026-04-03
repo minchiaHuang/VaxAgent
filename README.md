@@ -2,60 +2,50 @@
 
 VaxAgent is a fixture-first hackathon MVP for an explainable oncology research workflow copilot.
 
-It is designed to demonstrate one stable happy path:
+The repo is considered successful only when both of these demo paths are verifiable:
+
+1. `frontend fallback`: no backend, stable local demo
+2. `backend live path`: FastAPI running, WebSocket pipeline completes, report export works
+
+## What This Is
+
+- research-use prototype
+- explainable prioritization workflow
+- human-in-the-loop tool for oncology and translational research teams
+
+## What This Is Not
+
+- clinical product
+- treatment recommendation system
+- medical device
+- claim of biological efficacy
+
+## Happy Path
 
 1. load one benchmark tumor mutation dataset
-2. review a mutation summary
-3. inspect ranked neoantigen candidates
-4. read plain-English prioritization explanations
-5. preview an mRNA construct blueprint
+2. show mutation summary
+3. show ranked neoantigen candidates
+4. explain ranking logic in plain English
+5. preview a draft mRNA blueprint
 6. export one concise report
 
-This repository intentionally optimizes for demo reliability over scientific completeness.
+The happy path should be understandable in 60 to 90 seconds.
 
-## Product Framing
+## Repo Map
 
-This MVP is:
+- [`CODEX_BRIEF.md`](./CODEX_BRIEF.md): original scope, constraints, messaging rules
+- [`index.html`](./index.html), [`styles.css`](./styles.css), [`app.js`](./app.js): single-page frontend
+- [`backend/main.py`](./backend/main.py): FastAPI app with REST and WebSocket pipeline
+- [`backend/README.md`](./backend/README.md): backend-only setup and API guide
+- [`docs/mini-prd.md`](./docs/mini-prd.md): product intent and non-goals
+- [`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md): formal success definition and pass/fail checklist
+- [`docs/demo-script.md`](./docs/demo-script.md): spoken demo narrative
 
-- a research-use prototype
-- an explainable prioritization workflow
-- a human-in-the-loop tool for oncology and translational research teams
+## Run Modes
 
-This MVP is not:
+### Frontend Fallback
 
-- a clinical product
-- a treatment recommendation system
-- a medical device
-- a claim of biological efficacy
-
-## Repo Layout
-
-### Frontend (no backend required)
-
-- [`index.html`](./index.html): one-page demo UI
-- [`styles.css`](./styles.css): visual styling
-- [`app.js`](./app.js): deterministic benchmark dataset and UI logic
-- [`demo.md`](./demo.md): run instructions and demo path
-- [`docs/mini-prd.md`](./docs/mini-prd.md): condensed product definition
-- [`docs/demo-script.md`](./docs/demo-script.md): 60–90 second demo narrative
-- [`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md): MVP release gate
-- [`docs/out-of-scope.md`](./docs/out-of-scope.md): explicit non-goals
-
-### Backend (FastAPI pipeline)
-
-- [`backend/main.py`](./backend/main.py): FastAPI app with WebSocket pipeline endpoint
-- [`backend/agent/orchestrator.py`](./backend/agent/orchestrator.py): Claude-powered plain-English explanations (with fallback)
-- [`backend/pipeline/`](./backend/pipeline/): VCF parser, pVACseq runner, ESMFold client, mRNA designer, PDF report generator
-- [`backend/fixtures/`](./backend/fixtures/): precomputed HCC1395 benchmark data
-- [`backend/db/database.py`](./backend/db/database.py): SQLite run history
-- [`backend/requirements.txt`](./backend/requirements.txt): Python dependencies
-- [`backend/README.md`](./backend/README.md): backend setup and API reference
-
-## Running The MVP
-
-### Option A — Frontend with backend auto-detect (recommended)
-
-Open [`index.html`](./index.html) in a browser. On load, the app will try the local backend at `http://127.0.0.1:8000` first and will fall back to the embedded benchmark fixture if the API is unavailable.
+Use this when you need the simplest possible demo with no backend dependency.
 
 ```bash
 open index.html
@@ -63,36 +53,94 @@ open index.html
 python3 -m http.server 8080
 ```
 
-### Option B — Full backend pipeline
+Flow:
+
+- open the app
+- click `Load Benchmark Case`
+- the mode chip should show `Fallback fixture`
+- `Export Brief` downloads a markdown brief
+
+### Backend Live Path
+
+Use this when you want the full fixture-first pipeline, report generation, and run history.
 
 ```bash
 cd backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # add ANTHROPIC_API_KEY if available
-uvicorn main:app --reload --port 8000
+cp .env.example .env
+uvicorn main:app --port 8000
 ```
 
-WebSocket endpoint: `ws://localhost:8000/ws/pipeline`
-REST docs: `http://localhost:8000/docs`
+Then open the frontend and click `Load Benchmark Case`.
 
-When the backend is running, the frontend `Load Benchmark Case` action streams the live fixture-first pipeline and uses the generated PDF for export.
+Expected live behavior:
 
-## What Is Real Vs Stubbed
+- the mode chip shows `Backend connected`
+- the WebSocket pipeline completes
+- `Export Brief` opens the generated PDF
+
+## Verification Checklist
+
+### A. Frontend Fallback Pass
+
+- app opens without backend
+- clicking `Load Benchmark Case` shows `Fallback fixture`
+- mutation summary is visible
+- candidate ranking is visible
+- explanation panel is visible
+- blueprint preview is visible
+- markdown export downloads successfully
+- research-use / non-clinical framing is visible
+
+### B. Backend Live Path Pass
+
+- backend dependencies install cleanly
+- `uvicorn main:app --port 8000` starts successfully
+- `curl http://127.0.0.1:8000/health` returns `{"status":"ok",...}`
+- frontend shows `Backend connected`
+- WebSocket pipeline completes all steps:
+  - `load_dataset`
+  - `pvacseq`
+  - `ranking`
+  - `esmfold`
+  - `mrna_design`
+  - `report`
+  - `pipeline_complete`
+- PDF report route works
+- `GET /api/runs` shows the new run
+
+### C. Handoff Pass
+
+- a new contributor can follow this README without extra explanation
+- kept docs do not contradict each other
+- no outdated or duplicate project docs remain
+
+## Success Definition
+
+This project is `Handoff Ready` when:
+
+- both run modes pass their verification paths
+- the happy path is stable and repeatable
+- non-specialists can understand the output in under 2 minutes
+- the repo has one clear set of docs instead of overlapping versions
+
+## Real Vs Stubbed
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Frontend UI | Real | Complete one-page app |
-| Benchmark fixture data | Real | HCC1395 cell line, 10 candidates |
-| Candidate ranking algorithm | Real | Composite IC50 + expression + VAF score |
-| mRNA codon optimisation | Real | Human codon usage table |
-| Claude explanations | Real (with fallback) | Static text used if no API key |
-| PDF report | Real | reportlab, saved to `backend/reports/` |
-| SQLite run history | Real | Created automatically on first run |
-| ESMFold structure | Heuristic fallback | Sequence-based estimate; live API opt-in |
-| pVACseq execution | Fixture | Precomputed; Docker runner stub present |
-| VCF live parsing | Fixture | Precomputed stats; parser stub present |
+| Frontend UI | Real | one-page demo app |
+| Benchmark fixture data | Real | HCC1395 benchmark fixture |
+| Candidate ranking | Real | composite IC50 + expression + VAF + fold-change score |
+| Plain-English explanations | Real with fallback | Claude if available, static fallback otherwise |
+| mRNA blueprint preview | Real research preview | deterministic construct generation |
+| PDF report | Real | backend report generation |
+| SQLite run history | Real | saved by backend |
+| pVACseq live execution | Stubbed for MVP | fixture-first |
+| VCF live parsing | Stubbed for MVP | fixture-first |
+| ESMFold live enrichment | Optional / fallback | heuristic-safe for demo stability |
 
-## Principle
+## Rule
 
-If a feature threatens demo stability, it should be removed, simplified, or stubbed.
-# VaxAgent
+If a feature threatens demo stability, stub it, simplify it, or remove it.

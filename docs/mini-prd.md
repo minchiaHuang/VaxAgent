@@ -70,6 +70,17 @@ The MVP supports exactly one happy path:
 - no live dependency that can break the demo
 - no extra features beyond the stable happy path
 
+## Non-Goals
+
+- multiple datasets
+- live pVACseq execution in the demo path
+- live VCF parsing in the demo path
+- multi-user collaboration
+- saved history as a primary product feature
+- clinical recommendation logic
+- cure, efficacy, or treatment-selection claims
+- manufacturing-grade therapeutic design claims
+
 ## Build Strategy
 
 Prefer, in order:
