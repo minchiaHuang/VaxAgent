@@ -1,0 +1,37 @@
+{
+  "dataset_id": "hcc1395",
+  "dataset_name": "HCC1395 Breast Cancer Cell Line",
+  "source": "Griffith Lab / Washington University in St. Louis (public benchmark dataset)",
+  "tumor_type": "Triple-negative breast cancer",
+  "hla_alleles": [
+    "HLA-A*29:02",
+    "HLA-B*45:01",
+    "HLA-B*82:02",
+    "HLA-C*06:02",
+    "DQA1*03:03",
+    "DQB1*03:02",
+    "DRB1*04:05"
+  ],
+  "stats": {
+    "total_variants": 4741,
+    "somatic_snvs": 3214,
+    "missense_mutations": 1842,
+    "frameshift_indels": 287,
+    "nonsense_mutations": 156,
+    "splice_site_variants": 89,
+    "initial_predictions": 322,
+    "high_confidence_candidates": 78,
+    "shortlisted_candidates": 10,
+    "median_ic50_mt": 198.4,
+    "median_tumor_dna_vaf": 0.31,
+    "median_gene_expression_tpm": 18.7
+  },
+  "top_mutated_genes": [
+    "TP53", "PIK3CA", "BRCA1", "PTEN", "RB1",
+    "CDKN2A", "MAP3K1", "GATA3", "MLL3", "ARID1A"
+  ],
+  "tumor_mutation_burden": "High (34.7 mutations/Mb)",
+  "pipeline_version": "pVACseq v4.0 (precomputed fixture)",
+  "prediction_algorithms": ["MHCflurry", "NetMHCpan"],
+  "binding_threshold_nm": 500
+}

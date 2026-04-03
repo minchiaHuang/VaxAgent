@@ -1,0 +1,291 @@
+"""VaxAgent FastAPI backend.
+
+Endpoints:
+  GET  /health                  — liveness check
+  GET  /api/runs                — list past pipeline runs
+  GET  /api/runs/{run_id}       — get a specific run
+  GET  /api/runs/{run_id}/report — download PDF report
+  WS   /ws/pipeline             — run the full pipeline with streaming updates
+
+WebSocket message schema:
+  { "step": str, "status": "running"|"complete"|"error",
+    "explanation": str, "data": dict, "run_id": str }
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+
+load_dotenv()
+
+from agent.orchestrator import explain_step
+from db.database import get_run, init_db, list_runs, save_run
+from pipeline.esmfold_client import enrich_candidates_with_structure
+from pipeline.mrna_designer import design_construct
+from pipeline.pvacseq_runner import load_candidates_fixture, rank_candidates
+from pipeline.report_generator import generate_pdf
+from pipeline.vcf_parser import load_variant_stats_fixture
+
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
+
+app = FastAPI(
+    title="VaxAgent Research Copilot API",
+    description="Explainable oncology research workflow backend",
+    version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[CORS_ORIGIN] if CORS_ORIGIN != "*" else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    await init_db()
+
+
+# ---------------------------------------------------------------------------
+# REST endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok", "service": "vaxagent-backend"}
+
+
+@app.get("/api/runs")
+async def get_runs() -> JSONResponse:
+    runs = await list_runs()
+    return JSONResponse({"runs": runs})
+
+
+@app.get("/api/runs/{run_id}")
+async def get_single_run(run_id: str) -> JSONResponse:
+    run = await get_run(run_id)
+    if run is None:
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+    return JSONResponse(run)
+
+
+@app.get("/api/runs/{run_id}/report")
+async def download_report(run_id: str) -> FileResponse:
+    run = await get_run(run_id)
+    if run is None:
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+
+    report_path = run.get("payload", {}).get("report_path")
+    if not report_path or not Path(report_path).exists():
+        return JSONResponse({"error": "Report not yet generated"}, status_code=404)
+
+    return FileResponse(
+        report_path,
+        media_type="application/pdf",
+        filename=f"vaxagent-{run_id}.pdf",
+    )
+
+
+# ---------------------------------------------------------------------------
+# WebSocket pipeline
+# ---------------------------------------------------------------------------
+
+
+async def _send(ws: WebSocket, step: str, status: str, explanation: str = "", data: dict | None = None, run_id: str = "") -> None:
+    await ws.send_json(
+        {
+            "step": step,
+            "status": status,
+            "explanation": explanation,
+            "data": data or {},
+            "run_id": run_id,
+        }
+    )
+
+
+@app.websocket("/ws/pipeline")
+async def pipeline_ws(websocket: WebSocket, dataset_id: str = "hcc1395") -> None:
+    await websocket.accept()
+    run_id = uuid.uuid4().hex[:8]
+
+    try:
+        # ── Step 1: Load dataset ──────────────────────────────────────────
+        await _send(websocket, "load_dataset", "running", run_id=run_id)
+        await asyncio.sleep(0.3)
+
+        variant_stats = load_variant_stats_fixture(dataset_id)
+        explanation = await explain_step("load_dataset", variant_stats)
+        await _send(
+            websocket,
+            "load_dataset",
+            "complete",
+            explanation=explanation,
+            data=variant_stats,
+            run_id=run_id,
+        )
+
+        # ── Step 2: pVACseq candidate loading ────────────────────────────
+        await _send(websocket, "pvacseq", "running", run_id=run_id)
+        await asyncio.sleep(0.5)
+
+        raw_candidates = load_candidates_fixture(dataset_id)
+        pvacseq_context = {
+            "total_evaluated": variant_stats.get("stats", {}).get("initial_predictions", 322),
+            "passing_threshold": variant_stats.get("stats", {}).get("high_confidence_candidates", 78),
+        }
+        explanation = await explain_step("pvacseq", pvacseq_context)
+        await _send(
+            websocket,
+            "pvacseq",
+            "complete",
+            explanation=explanation,
+            data={"candidate_count": len(raw_candidates)},
+            run_id=run_id,
+        )
+
+        # ── Step 3: Rank and filter ───────────────────────────────────────
+        await _send(websocket, "ranking", "running", run_id=run_id)
+        await asyncio.sleep(0.4)
+
+        ranked = rank_candidates(raw_candidates, top_n=10)
+        top = ranked[0] if ranked else {}
+        ranking_context = {
+            "candidates": ranked,
+            "top_candidate": f"{top.get('gene', '')} {top.get('mutation', '')}",
+            "top_score": top.get("priority_score", 0),
+        }
+        explanation = await explain_step("ranking", ranking_context)
+        await _send(
+            websocket,
+            "ranking",
+            "complete",
+            explanation=explanation,
+            data={"candidates": ranked},
+            run_id=run_id,
+        )
+
+        # ── Step 4: ESMFold structure enrichment ─────────────────────────
+        await _send(websocket, "esmfold", "running", run_id=run_id)
+        await asyncio.sleep(0.3)
+
+        enriched = await enrich_candidates_with_structure(ranked[:5])
+        explanation = await explain_step("esmfold", {})
+        await _send(
+            websocket,
+            "esmfold",
+            "complete",
+            explanation=explanation,
+            data={"enriched_count": len(enriched)},
+            run_id=run_id,
+        )
+
+        # Merge enrichment back into ranked list
+        enriched_map = {c["rank"]: c for c in enriched}
+        for c in ranked:
+            if c["rank"] in enriched_map:
+                c.update({
+                    k: v for k, v in enriched_map[c["rank"]].items()
+                    if k in ("plddt", "surface_accessible")
+                })
+
+        # ── Step 5: mRNA construct design ────────────────────────────────
+        await _send(websocket, "mrna_design", "running", run_id=run_id)
+        await asyncio.sleep(0.4)
+
+        blueprint = design_construct(ranked, top_n=5)
+        explanation = await explain_step("mrna_design", blueprint)
+        await _send(
+            websocket,
+            "mrna_design",
+            "complete",
+            explanation=explanation,
+            data=blueprint,
+            run_id=run_id,
+        )
+
+        # ── Step 6: PDF report ───────────────────────────────────────────
+        await _send(websocket, "report", "running", run_id=run_id)
+        await asyncio.sleep(0.3)
+
+        # Attach explanations to top candidates before PDF generation
+        for c in ranked[:3]:
+            if not c.get("explanation"):
+                c["explanation"] = (
+                    f"{c['gene']} {c['mutation']} ranks #{c['rank']} with a priority score of "
+                    f"{c['priority_score']}. Predicted binding IC50 is {c['ic50_mt']} nM "
+                    f"(fold-change vs wildtype: {c['fold_change']}×). "
+                    f"Gene expression is {c['gene_expression_tpm']} TPM with "
+                    f"{c['clonality']} clonality (VAF {c['tumor_dna_vaf']:.0%})."
+                )
+
+        report_path = generate_pdf(run_id, variant_stats, ranked, blueprint)
+        explanation = await explain_step("report", {})
+        await _send(
+            websocket,
+            "report",
+            "complete",
+            explanation=explanation,
+            data={"report_url": f"/api/runs/{run_id}/report"},
+            run_id=run_id,
+        )
+
+        # ── Persist run ───────────────────────────────────────────────────
+        summary = {
+            "dataset_name": variant_stats.get("dataset_name", ""),
+            "top_candidate": f"{top.get('gene', '')} {top.get('mutation', '')}",
+            "candidate_count": len(ranked),
+            "construct_id": blueprint.get("construct_id", ""),
+        }
+        payload = {
+            "variant_stats": variant_stats,
+            "candidates": ranked,
+            "blueprint": blueprint,
+            "report_path": report_path,
+        }
+        await save_run(
+            run_id=run_id,
+            dataset_id=dataset_id,
+            status="complete",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            summary=summary,
+            payload=payload,
+        )
+
+        # ── Pipeline complete ─────────────────────────────────────────────
+        await _send(
+            websocket,
+            "pipeline_complete",
+            "complete",
+            explanation="Pipeline completed successfully. All steps passed.",
+            data={"run_id": run_id, "report_url": f"/api/runs/{run_id}/report"},
+            run_id=run_id,
+        )
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        await _send(
+            websocket,
+            "error",
+            "error",
+            explanation=f"Pipeline error: {exc}",
+            run_id=run_id,
+        )
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

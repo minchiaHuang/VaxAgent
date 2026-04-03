@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VaxAgent Research Copilot MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">HSIL Hackathon 2026 MVP</p>
+          <h1>Explainable Oncology Research Workflow Copilot</h1>
+          <p class="hero-text">
+            One benchmark dataset. One stable ranking workflow. One exportable
+            research brief.
+          </p>
+        </div>
+        <div class="hero-panel">
+          <div class="notice-chip">Research-use prototype</div>
+          <p class="notice-copy">
+            This demo is not a clinical product, not a treatment
+            recommendation, and not a claim of biological efficacy.
+          </p>
+          <div class="status-stack">
+            <div id="mode-chip" class="mode-chip">Awaiting run</div>
+            <p id="pipeline-status" class="status-copy">
+              The load action will try the local backend first and fall back to the embedded
+              benchmark fixture if the API is unavailable.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button id="load-demo" class="primary-button">Load Benchmark Case</button>
+            <button id="export-brief" class="secondary-button" disabled>
+              Export Brief
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="panel stepper-panel">
+          <div class="section-heading">
+            <p class="section-kicker">Demo Path</p>
+            <h2>Single happy-path workflow</h2>
+          </div>
+          <ol id="stepper" class="stepper"></ol>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <p class="section-kicker">Benchmark Dataset</p>
+            <h2 id="dataset-title">Awaiting demo load</h2>
+          </div>
+          <div id="dataset-banner" class="dataset-banner muted-banner">
+            Load the benchmark case to render the deterministic oncology research demo.
+          </div>
+          <div id="summary-grid" class="summary-grid"></div>
+          <div id="summary-note" class="summary-note empty-state">
+            The mutation summary will appear here once the benchmark case is loaded.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <p class="section-kicker">Prioritized Candidates</p>
+            <h2>Ranked neoantigen shortlist</h2>
+          </div>
+          <div id="candidate-list" class="candidate-list empty-state">
+            Candidate ranking appears after the benchmark case is loaded.
+          </div>
+        </section>
+
+        <section class="panel explanation-layout">
+          <div>
+            <div class="section-heading">
+              <p class="section-kicker">Why This Candidate?</p>
+              <h2>Plain-English explanation</h2>
+            </div>
+            <div id="explanation-card" class="explanation-card empty-state">
+              Select a ranked candidate to inspect the explanation panel.
+            </div>
+          </div>
+          <div>
+            <div class="section-heading">
+              <p class="section-kicker">Blueprint Preview</p>
+              <h2>Draft mRNA construct</h2>
+            </div>
+            <div id="blueprint-card" class="blueprint-card empty-state">
+              The construct preview is shown after the benchmark case is loaded.
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <p class="section-kicker">Limits</p>
+            <h2>Human-in-the-loop guardrails</h2>
+          </div>
+          <ul id="limitations-list" class="limitations-list">
+            <li>Benchmark case only.</li>
+            <li>No clinical recommendation or treatment guidance.</li>
+            <li>Human expert review remains required.</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+  </html>
