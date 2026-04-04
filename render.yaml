@@ -1,0 +1,32 @@
+services:
+  # ── Backend: FastAPI ────────────────────────────────────────────────────────
+  - type: web
+    name: vaxagent-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: USE_FIXTURES
+        value: "true"
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: ESMFOLD_API_URL
+        value: "https://api.esmatlas.com/foldSequence/v1/pdb/"
+      - key: ANTHROPIC_API_KEY
+        sync: false   # fill this in the Render dashboard (optional)
+
+  # ── Frontend: Static Site ───────────────────────────────────────────────────
+  - type: web
+    name: vaxagent-frontend
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /index.html
+        destination: /index.html
