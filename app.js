@@ -1,7 +1,7 @@
 const _isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const API_ORIGIN =
   new URLSearchParams(window.location.search).get("api") ||
-  (_isLocal ? "http://127.0.0.1:8000" : "https://vaxagent-backend.onrender.com");
+  (_isLocal ? "http://127.0.0.1:8000" : "https://vaxagentvaxagent-backend.onrender.com");
 const WS_URL = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline`;
 
 const PIPELINE_STEPS = [
