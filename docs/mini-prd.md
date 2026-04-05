@@ -46,6 +46,11 @@ The MVP supports exactly one happy path:
 5. preview one draft mRNA construct
 6. export one concise summary
 
+Uploaded VCF handling is a supporting validation workflow, not the primary benchmark demo path:
+
+- `Quick demo` parses real variant statistics from an uploaded VCF but keeps benchmark candidate ranking
+- `Full analysis` runs a long-lived local pVACseq job when Docker and HLA inputs are available
+
 ## Requirements
 
 - deterministic fixture-first behavior
@@ -64,17 +69,17 @@ The MVP supports exactly one happy path:
 
 ## Constraints
 
-- no arbitrary uploads
+- benchmark flow remains the primary demo
 - no auth or multi-user workflows
 - no production deployment work
-- no live dependency that can break the demo
+- no live dependency that can break the primary stage demo
 - no extra features beyond the stable happy path
 
 ## Non-Goals
 
 - multiple datasets
-- live pVACseq execution in the demo path
-- live VCF parsing in the demo path
+- live pVACseq execution in the primary 60 to 90 second demo path
+- user uploads as a clinical or production workflow
 - multi-user collaboration
 - saved history as a primary product feature
 - clinical recommendation logic

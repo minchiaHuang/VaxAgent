@@ -1,11 +1,12 @@
 # VaxAgent Research Copilot MVP
 
-VaxAgent is a fixture-first hackathon MVP for an explainable oncology research workflow copilot.
+VaxAgent is a fixture-first hackathon MVP for an explainable oncology research workflow copilot, with optional uploaded VCF analysis paths for local validation.
 
-The repo is considered successful only when both of these demo paths are verifiable:
+The repo is considered successful only when the benchmark demo path is stable and the backend-connected upload paths are verifiable:
 
 1. `frontend fallback`: no backend, stable local demo
-2. `backend live path`: FastAPI running, WebSocket pipeline completes, report export works
+2. `backend benchmark path`: FastAPI running, WebSocket pipeline completes, report export works
+3. `uploaded VCF paths`: quick analysis and full analysis behave as documented
 
 ## What This Is
 
@@ -60,9 +61,9 @@ Flow:
 - the mode chip should show `Fallback fixture`
 - `Export Brief` downloads a markdown brief
 
-### Backend Live Path
+### Backend Benchmark Path
 
-Use this when you want the full fixture-first pipeline, report generation, and run history.
+Use this when you want the full benchmark pipeline, report generation, and run history.
 
 ```bash
 cd backend
@@ -80,6 +81,38 @@ Expected live behavior:
 - the mode chip shows `Backend connected`
 - the WebSocket pipeline completes
 - `Export Brief` opens the generated PDF
+- `Run history and reports` shows recent saved backend runs
+- completed runs can be reopened from the history panel
+- full-analysis pVACseq jobs resume after refresh while the backend job is still running
+
+### Uploaded VCF Paths
+
+When the backend is running, the landing screen exposes two upload modes:
+
+- `Quick demo`: parses your uploaded `.vcf` / `.vcf.gz` and updates the mutation summary, but candidate ranking still uses the HCC1395 benchmark fixture
+- `Full analysis`: requires Docker and HLA alleles, starts a real pVACseq job, and hydrates the UI from the finished job result
+
+Expected quick-upload behavior:
+
+- `POST /api/upload` accepts `.vcf` or `.vcf.gz`
+- the dataset title changes to the uploaded filename
+- the summary cards reflect the uploaded file
+- the `pvacseq` explanation explicitly says the shortlist still comes from the benchmark fixture
+
+Expected full-analysis behavior:
+
+- Docker must be available or the mode stays disabled
+- HLA alleles are required before submission
+- `POST /api/jobs/pvacseq` returns a `job_id`
+- `GET /api/jobs/{job_id}` progresses through `queued` / `running` / `complete`
+- refreshing the page resumes polling for the active job
+- after completion, the WebSocket pipeline is reopened with `job_id=<...>` and uses live pVACseq candidates instead of the fixture
+
+Notes:
+
+- pre-annotated VCF files that already contain `CSQ=` records skip the VEP step
+- non-annotated VCF files require `VEP_CACHE_DIR` and `VEP_ASSEMBLY` to be configured in `backend/.env`
+- full analysis is a long-running validation path, not the primary 60 to 90 second hackathon demo
 
 ## Verification Checklist
 
@@ -94,7 +127,7 @@ Expected live behavior:
 - markdown export downloads successfully
 - research-use / non-clinical framing is visible
 
-### B. Backend Live Path Pass
+### B. Backend Benchmark Path Pass
 
 - backend dependencies install cleanly
 - `uvicorn main:app --port 8000` starts successfully
@@ -111,7 +144,20 @@ Expected live behavior:
 - PDF report route works
 - `GET /api/runs` shows the new run
 
-### C. Handoff Pass
+### C. Uploaded VCF Pass
+
+- `POST /api/upload` accepts `.vcf` / `.vcf.gz` and rejects other file extensions
+- quick upload updates the mutation summary using the uploaded filename
+- quick upload still explains that candidate ranking is benchmark-based
+- `Full analysis` stays disabled when Docker is unavailable
+- `POST /api/jobs/pvacseq` rejects missing HLA alleles
+- a completed full-analysis job produces:
+  - `backend/jobs/<job_id>/MHC_Class_I/<sample>.MHC_I.filtered.tsv`
+  - `backend/jobs/<job_id>/candidates.json`
+- `GET /api/jobs/{job_id}` returns `complete` with `progress_pct=100`
+- reopening the completed `job_id` through `/ws/pipeline?job_id=<...>` loads the live shortlist into the UI
+
+### D. Handoff Pass
 
 - a new contributor can follow this README without extra explanation
 - kept docs do not contradict each other
@@ -140,13 +186,14 @@ Coverage includes:
 - backend REST and WebSocket happy paths
 - upload and pVACseq job error handling
 - pipeline scoring, VCF parsing, mRNA design, PDF generation, and persistence
-- frontend fallback flow, backend-connected flow, quick upload flow, and guardrail UI
+- frontend fallback flow, backend benchmark flow, quick upload flow, full-analysis UI guardrails, and report hydration
 
 ## Success Definition
 
 This project is `Handoff Ready` when:
 
-- both run modes pass their verification paths
+- the benchmark demo paths pass their verification paths
+- uploaded VCF paths are documented and testable
 - the happy path is stable and repeatable
 - non-specialists can understand the output in under 2 minutes
 - the repo has one clear set of docs instead of overlapping versions
@@ -157,13 +204,15 @@ This project is `Handoff Ready` when:
 | -------------------------- | --------------------- | ----------------------------------------------------- |
 | Frontend UI                | Real                  | one-page demo app                                     |
 | Benchmark fixture data     | Real                  | HCC1395 benchmark fixture                             |
+| Uploaded VCF summary       | Real                  | `POST /api/upload` parses real `.vcf` / `.vcf.gz`     |
+| Quick-upload ranking       | Fixture-backed        | uploaded summary + benchmark candidate shortlist      |
 | Candidate ranking          | Real                  | composite IC50 + expression + VAF + fold-change score |
 | Plain-English explanations | Real with fallback    | Claude if available, static fallback otherwise        |
 | mRNA blueprint preview     | Real research preview | deterministic construct generation                    |
 | PDF report                 | Real                  | backend report generation                             |
 | SQLite run history         | Real                  | saved by backend                                      |
-| pVACseq live execution     | Stubbed for MVP       | fixture-first                                         |
-| VCF live parsing           | Stubbed for MVP       | fixture-first                                         |
+| pVACseq live execution     | Real in `Full analysis` | Docker job under `backend/jobs/<job_id>/`           |
+| VCF live parsing           | Real on upload        | forced live parse for `/api/upload`                   |
 | ESMFold live enrichment    | Optional / fallback   | heuristic-safe for demo stability                     |
 
 ## Rule

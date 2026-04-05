@@ -48,6 +48,16 @@ The MVP is done only when it is `Handoff Ready`, not just when one local demo ha
 - PDF report export works
 - `GET /api/runs` contains the new run
 
+### Uploaded VCF paths must pass
+
+- quick upload accepts `.vcf` and `.vcf.gz`
+- quick upload updates the mutation summary using the uploaded file
+- quick upload clearly states that candidate ranking still comes from the benchmark fixture
+- full analysis requires Docker and at least one HLA allele
+- a valid full-analysis job reaches `complete`
+- the finished job writes `MHC_I.filtered.tsv` and `candidates.json`
+- reopening a completed `job_id` loads the live shortlist into the same UI
+
 ## Handoff Success
 
 - README is sufficient as the primary runbook

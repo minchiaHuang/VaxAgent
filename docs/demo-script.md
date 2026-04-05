@@ -38,6 +38,8 @@ Say:
 
 "If this says `Backend connected`, the frontend is using the live local pipeline path. If it says `Fallback fixture`, the demo still works safely without the backend. Both paths preserve the same happy-path story."
 
+If upload modes are visible, do not switch to them in the primary 60 to 90 second demo unless you have already pre-validated the job outputs.
+
 ### Step 3 — Mutation summary
 
 Action:
@@ -101,10 +103,13 @@ Say:
 - explainability over complexity
 - deterministic demo path over fragile live integrations
 - human review remains required
+- uploaded VCF paths exist, but they are validation features rather than the primary pitch path
 
 ## Required Disclosures
 
-- the candidate ranking is benchmark- and fixture-based for demo stability
+- the benchmark demo candidate ranking is benchmark- and fixture-based for demo stability
+- quick uploaded-file analysis only changes the mutation summary; it does not run live pVACseq
+- full analysis can run live pVACseq, but it is a long-running local validation path rather than the core stage demo
 - the blueprint preview is a research draft, not a manufacturable therapeutic construct
 - the app does not provide treatment recommendations
-- no arbitrary real patient uploads are supported in this MVP
+- uploaded files are research-use only and still require human review
