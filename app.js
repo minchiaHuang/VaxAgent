@@ -4,7 +4,9 @@ const API_ORIGIN =
   QUERY_PARAMS.get("api") ||
   (_isLocal ? "http://127.0.0.1:8000" : "https://vaxagentvaxagent-backend.onrender.com");
 const PIPELINE_CONNECT_TIMEOUT_MS = Number(QUERY_PARAMS.get("timeout_ms")) || 8000;
+const JOB_POLL_INTERVAL_MS = Number(QUERY_PARAMS.get("job_poll_ms")) || 10000;
 const WS_URL = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline`;
+const PENDING_FULL_ANALYSIS_KEY = "vaxagent.pendingFullAnalysis";
 
 const PIPELINE_STEPS = [
   {
@@ -193,9 +195,15 @@ const state = {
   blueprint: null,
   selectedCandidateRank: null,
   reportUrl: "",
+  currentRunId: "",
   stepStatuses: Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "pending"])),
   stepExplanations: {},
-  ws: null
+  ws: null,
+  historyRuns: [],
+  historyStatus: "Run history appears when the backend is connected.",
+  historyLoading: false,
+  activeJob: null,
+  retryAction: ""
 };
 
 const elements = {
@@ -224,7 +232,11 @@ const elements = {
   jobProgressLabel: document.getElementById("job-progress-label"),
   jobElapsed: document.getElementById("job-elapsed"),
   progressBar: document.getElementById("progress-bar"),
-  jobProgressNote: document.getElementById("job-progress-note")
+  jobProgressNote: document.getElementById("job-progress-note"),
+  retryLastActionButton: document.getElementById("retry-last-action"),
+  refreshHistoryButton: document.getElementById("refresh-history"),
+  historyStatus: document.getElementById("history-status"),
+  historyList: document.getElementById("history-list")
 };
 
 const MODE_DESCRIPTIONS = {
@@ -237,6 +249,8 @@ const MODE_DESCRIPTIONS = {
 let _analysisMode = "quick";
 let _jobPollInterval = null;
 let _jobStartTime = null;
+let _jobElapsedInterval = null;
+let _jobPollErrorCount = 0;
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-US").format(value);
@@ -250,6 +264,32 @@ function sentenceCase(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatTimestamp(value) {
+  if (!value) return "Unknown time";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(parsed);
+}
+
+function setRetryAction(action) {
+  state.retryAction = action;
+  elements.retryLastActionButton.hidden = !action;
+}
+
 function resetRunState() {
   state.loaded = false;
   state.variantStats = null;
@@ -257,6 +297,8 @@ function resetRunState() {
   state.blueprint = null;
   state.selectedCandidateRank = null;
   state.reportUrl = "";
+  state.currentRunId = "";
+  state.activeJob = null;
   state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "pending"]));
   state.stepExplanations = {};
   elements.exportButton.disabled = true;
@@ -299,6 +341,65 @@ function renderStepper() {
       </li>
     `;
   }).join("");
+}
+
+function renderRunHistory() {
+  elements.historyStatus.textContent = state.historyStatus;
+
+  if (state.historyLoading) {
+    elements.historyList.className = "history-list";
+    elements.historyList.innerHTML = '<div class="history-card"><p>Loading recent runs...</p></div>';
+    return;
+  }
+
+  if (!state.historyRuns.length) {
+    elements.historyList.className = "history-list empty-state";
+    elements.historyList.textContent = "No backend run history yet.";
+    return;
+  }
+
+  elements.historyList.className = "history-list";
+  elements.historyList.innerHTML = state.historyRuns
+    .map((run) => {
+      const summary = run.summary || {};
+      const isActive = run.run_id === state.currentRunId;
+      const reportUrl = `${API_ORIGIN}/api/runs/${run.run_id}/report`;
+
+      return `
+        <article class="history-card reveal ${isActive ? "is-active" : ""}" data-run-id="${escapeHtml(run.run_id)}">
+          <div>
+            <h3>${escapeHtml(summary.dataset_name || run.dataset_id || "Saved pipeline run")}</h3>
+            <p>${escapeHtml(summary.top_candidate || "Top candidate unavailable")} · ${escapeHtml(run.status)}</p>
+            <div class="history-meta">
+              <span class="history-pill">Run ${escapeHtml(run.run_id)}</span>
+              <span class="history-pill">${escapeHtml(formatTimestamp(run.created_at))}</span>
+              <span class="history-pill">${escapeHtml(`${summary.candidate_count || 0} candidates`)}</span>
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="secondary-button" data-run-report="${escapeHtml(reportUrl)}">Open Report</button>
+            <button class="primary-button" data-run-open="${escapeHtml(run.run_id)}">Reopen Run</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  elements.historyList.querySelectorAll("[data-run-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const runId = button.getAttribute("data-run-open");
+      if (runId) void reopenRun(runId);
+    });
+  });
+
+  elements.historyList.querySelectorAll("[data-run-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const reportUrl = button.getAttribute("data-run-report");
+      if (reportUrl) {
+        window.open(reportUrl, "_blank", "noopener");
+      }
+    });
+  });
 }
 
 function buildSummaryMetrics(variantStats) {
@@ -416,6 +517,20 @@ function buildCandidateNarrative(candidate) {
   };
 }
 
+function buildCandidateComparison(candidate, nextCandidate) {
+  if (!candidate || !nextCandidate) return "";
+
+  const bindingDelta = Math.round((nextCandidate.ic50_mt || 0) - (candidate.ic50_mt || 0));
+  const expressionDelta = ((candidate.gene_expression_tpm || 0) - (nextCandidate.gene_expression_tpm || 0)).toFixed(1);
+  const vafDelta = Math.round(((candidate.tumor_dna_vaf || 0) - (nextCandidate.tumor_dna_vaf || 0)) * 100);
+
+  return `${candidate.gene} ${candidate.mutation} stays ahead of ${nextCandidate.gene} ${nextCandidate.mutation} because it combines ${
+    bindingDelta > 0 ? `${bindingDelta} nM stronger predicted binding` : "comparable predicted binding"
+  }, ${expressionDelta > 0 ? `${expressionDelta} TPM higher expression` : "similar expression"}, and ${
+    vafDelta > 0 ? `${vafDelta}% higher DNA VAF` : "similar clonality"
+  }.`;
+}
+
 function renderExplanation() {
   if (!state.candidates.length) {
     elements.explanationCard.className = "explanation-card empty-state";
@@ -429,6 +544,8 @@ function renderExplanation() {
     state.candidates[0];
   const narrative = buildCandidateNarrative(candidate);
   const rankingNote = state.stepExplanations.ranking;
+  const nextCandidate = state.candidates.find((item) => item.rank === candidate.rank + 1);
+  const comparison = buildCandidateComparison(candidate, nextCandidate);
 
   state.selectedCandidateRank = candidate.rank;
   elements.explanationCard.className = "explanation-card reveal";
@@ -436,6 +553,7 @@ function renderExplanation() {
     <h3>${candidate.gene} ${candidate.mutation} ranks #${candidate.rank}</h3>
     <p class="explanation-copy">${narrative.summary}</p>
     ${rankingNote ? `<p class="explanation-copy">${rankingNote}</p>` : ""}
+    ${comparison ? `<p class="explanation-copy"><strong>Why it outranks the next candidate:</strong> ${comparison}</p>` : ""}
     <ul>
       ${narrative.bullets.map((reason) => `<li>${reason}</li>`).join("")}
     </ul>
@@ -498,6 +616,7 @@ function renderLimitations() {
 
 function renderAll() {
   renderStepper();
+  renderRunHistory();
   renderSummary();
   renderCandidates();
   renderExplanation();
@@ -529,13 +648,18 @@ function applyPipelineMessage(message) {
   if (message.step === "pipeline_complete" && message.status === "complete") {
     state.loaded = true;
     state.loading = false;
+    state.currentRunId = message.run_id || message.data?.run_id || "";
+    state.activeJob = null;
     elements.exportButton.disabled = !state.reportUrl;
     elements.loadButton.disabled = false;
     elements.loadButton.textContent = "Reload Benchmark Case";
+    clearPendingFullAnalysis();
+    setRetryAction("");
     updateStatus(
       "backend",
       "Local backend run completed successfully. The export button now downloads the generated PDF research brief."
     );
+    void fetchRunHistory();
   }
 
   renderAll();
@@ -545,6 +669,7 @@ function applyFallbackRun() {
   resetRunState();
   state.loaded = true;
   state.loading = false;
+  state.activeJob = null;
   state.variantStats = FALLBACK_RUN.variantStats;
   state.candidates = FALLBACK_RUN.candidates;
   state.blueprint = FALLBACK_RUN.blueprint;
@@ -559,6 +684,108 @@ function applyFallbackRun() {
     "Backend connection was unavailable, so the app loaded the embedded benchmark fixture instead. The demo path remains stable."
   );
   renderAll();
+}
+
+function applySavedRun(run) {
+  const payload = run.payload || {};
+
+  resetRunState();
+  state.loaded = true;
+  state.loading = false;
+  state.variantStats = payload.variant_stats || null;
+  state.candidates = payload.candidates || [];
+  state.blueprint = payload.blueprint || null;
+  state.selectedCandidateRank = state.candidates[0]?.rank || null;
+  state.currentRunId = run.run_id;
+  state.reportUrl = payload.report_path ? `${API_ORIGIN}/api/runs/${run.run_id}/report` : "";
+  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "complete"]));
+  state.stepExplanations = {
+    load_dataset: "Loaded from saved backend run history.",
+    ranking: "Candidate ranking was restored from a completed backend run.",
+    report: "The PDF report for this saved run is ready to open."
+  };
+  elements.exportButton.disabled = !state.reportUrl;
+  elements.loadButton.disabled = false;
+  elements.loadButton.textContent = "Reload Benchmark Case";
+  updateStatus(
+    "backend",
+    `Loaded saved run ${run.run_id}. The dataset summary, ranked candidates, and PDF report were restored from backend history.`
+  );
+  renderAll();
+}
+
+function persistPendingFullAnalysis(jobId, fileName, startedAt = Date.now()) {
+  try {
+    localStorage.setItem(
+      PENDING_FULL_ANALYSIS_KEY,
+      JSON.stringify({ jobId, fileName, startedAt })
+    );
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+function readPendingFullAnalysis() {
+  try {
+    const raw = localStorage.getItem(PENDING_FULL_ANALYSIS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingFullAnalysis() {
+  try {
+    localStorage.removeItem(PENDING_FULL_ANALYSIS_KEY);
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+async function fetchRunHistory() {
+  state.historyLoading = true;
+  state.historyStatus = "Loading recent runs from the backend...";
+  renderRunHistory();
+
+  try {
+    const response = await fetch(`${API_ORIGIN}/api/runs`);
+    if (!response.ok) {
+      throw new Error(`History request failed (HTTP ${response.status})`);
+    }
+
+    const result = await response.json();
+    state.historyRuns = result.runs || [];
+    state.historyStatus = state.historyRuns.length
+      ? "Recent backend runs can be reopened or exported directly from here."
+      : "The backend is available, but no runs have been saved yet.";
+  } catch {
+    state.historyRuns = [];
+    state.historyStatus = "Run history is unavailable until the backend responds.";
+  } finally {
+    state.historyLoading = false;
+    renderRunHistory();
+  }
+}
+
+async function reopenRun(runId) {
+  state.historyStatus = `Loading saved run ${runId}...`;
+  renderRunHistory();
+
+  try {
+    const response = await fetch(`${API_ORIGIN}/api/runs/${runId}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Run reload failed (HTTP ${response.status})`);
+    }
+
+    const run = await response.json();
+    applySavedRun(run);
+    state.historyStatus = `Saved run ${runId} is active in the workspace.`;
+    renderRunHistory();
+  } catch (err) {
+    state.historyStatus = `Could not reopen run ${runId}: ${err.message}`;
+    renderRunHistory();
+  }
 }
 
 function buildFallbackReport() {
@@ -734,8 +961,12 @@ function updateProgressBar(pct, label) {
   if (label) elements.jobProgressLabel.textContent = label;
 }
 
-function startElapsedTimer() {
-  _jobStartTime = Date.now();
+function startElapsedTimer(startedAt = Date.now()) {
+  if (_jobElapsedInterval) {
+    window.clearInterval(_jobElapsedInterval);
+  }
+
+  _jobStartTime = startedAt;
   const tick = () => {
     if (!_jobStartTime) return;
     const elapsed = Math.floor((Date.now() - _jobStartTime) / 1000);
@@ -744,7 +975,7 @@ function startElapsedTimer() {
     elements.jobElapsed.textContent = `${mins}m ${secs}s elapsed`;
   };
   tick();
-  return window.setInterval(tick, 1000);
+  _jobElapsedInterval = window.setInterval(tick, 1000);
 }
 
 function stopPolling() {
@@ -752,7 +983,138 @@ function stopPolling() {
     window.clearInterval(_jobPollInterval);
     _jobPollInterval = null;
   }
+  if (_jobElapsedInterval) {
+    window.clearInterval(_jobElapsedInterval);
+    _jobElapsedInterval = null;
+  }
+  _jobPollErrorCount = 0;
   _jobStartTime = null;
+  elements.jobElapsed.textContent = "";
+}
+
+function restorePrimaryActions() {
+  state.loading = false;
+  elements.analyseButton.disabled = !elements.vcfFileInput.files[0];
+  elements.analyseButton.textContent = "Analyse My File";
+  elements.loadButton.disabled = false;
+}
+
+function describeRetryAction(action) {
+  if (action === "demo") return "Retry Benchmark Load";
+  if (action === "quick-analysis") return "Retry Quick Analysis";
+  if (action === "full-analysis") return "Retry Full Analysis";
+  if (action === "resume-full-analysis") return "Retry Result Reopen";
+  return "Retry Last Action";
+}
+
+function scheduleRetryAction(action) {
+  setRetryAction(action);
+  if (action) {
+    elements.retryLastActionButton.textContent = describeRetryAction(action);
+  }
+}
+
+async function startCompletedJobPipeline(jobId, fileName) {
+  updateProgressBar(100, "pVACseq complete. Loading results...");
+  setUploadStatus(`pVACseq complete for ${fileName}. Running analysis pipeline...`);
+
+  const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?job_id=${jobId}`;
+  const ok = await runBackendPipelineWithUrl(wsUrl);
+  setProgressVisible(false);
+
+  if (!ok) {
+    setUploadStatus(
+      "The backend could not reopen this completed pVACseq job into the workspace. Retry to request the finished results again.",
+      true
+    );
+    scheduleRetryAction("resume-full-analysis");
+    updateStatus(
+      "idle",
+      "The long-running backend job finished, but the final UI hydration step failed. Retry to reopen the completed result."
+    );
+  } else {
+    setRetryAction("");
+    setUploadStatus(`Full pVACseq analysis complete for ${fileName}.`);
+  }
+}
+
+async function pollFullAnalysisJob(jobId, fileName) {
+  try {
+    const res = await fetch(`${API_ORIGIN}/api/jobs/${jobId}`);
+    if (!res.ok) {
+      return;
+    }
+
+    _jobPollErrorCount = 0;
+    const job = await res.json();
+    state.activeJob = {
+      jobId,
+      fileName,
+      status: job.status,
+      error: job.error_msg || ""
+    };
+
+    updateProgressBar(job.progress_pct || 5, `pVACseq ${job.status}...`);
+    setUploadStatus(
+      job.status === "running"
+        ? `pVACseq is running for ${fileName}. Job ${jobId} remains resumable if you refresh this page.`
+        : `Job ${jobId} is ${job.status}.`,
+      false
+    );
+
+    if (job.status === "complete") {
+      stopPolling();
+      await startCompletedJobPipeline(jobId, fileName);
+      restorePrimaryActions();
+      return;
+    }
+
+    if (job.status === "failed") {
+      stopPolling();
+      clearPendingFullAnalysis();
+      setProgressVisible(false);
+      setUploadStatus(`pVACseq failed: ${job.error_msg || "unknown error"}`, true);
+      scheduleRetryAction("full-analysis");
+      state.activeJob = null;
+      restorePrimaryActions();
+      updateStatus(
+        "idle",
+        "The backend job failed before candidate ranking could be loaded. Review the error above and retry when ready."
+      );
+    }
+  } catch {
+    _jobPollErrorCount += 1;
+    if (_jobPollErrorCount >= 3) {
+      setUploadStatus(
+        `Status polling lost contact with job ${jobId}. VaxAgent will keep retrying, and refreshing this page will resume the same job.`,
+        true
+      );
+    }
+  }
+}
+
+function beginFullAnalysisPolling(jobId, fileName, options = {}) {
+  stopPolling();
+
+  const startedAt = options.startedAt || Date.now();
+  persistPendingFullAnalysis(jobId, fileName, startedAt);
+  state.activeJob = {
+    jobId,
+    fileName,
+    status: "queued",
+    error: ""
+  };
+
+  setProgressVisible(true);
+  updateProgressBar(options.initialProgress || 5, options.initialLabel || "pVACseq queued...");
+  elements.jobProgressNote.textContent =
+    "This full-analysis job is resumable. If the page refreshes, VaxAgent will reconnect to the same backend job automatically.";
+  startElapsedTimer(startedAt);
+
+  void pollFullAnalysisJob(jobId, fileName);
+  _jobPollInterval = window.setInterval(() => {
+    void pollFullAnalysisJob(jobId, fileName);
+  }, JOB_POLL_INTERVAL_MS);
 }
 
 async function submitFullPipeline() {
@@ -772,6 +1134,7 @@ async function submitFullPipeline() {
   elements.analyseButton.disabled = true;
   elements.loadButton.disabled = true;
   elements.analyseButton.textContent = "Submitting...";
+  setRetryAction("");
   setUploadStatus("Uploading VCF and submitting pVACseq job...");
   setProgressVisible(true);
   updateProgressBar(2, "Uploading file...");
@@ -797,68 +1160,79 @@ async function submitFullPipeline() {
   } catch (err) {
     setUploadStatus(`Submission error: ${err.message}`, true);
     setProgressVisible(false);
-    state.loading = false;
-    elements.analyseButton.disabled = false;
-    elements.analyseButton.textContent = "Analyse My File";
-    elements.loadButton.disabled = false;
+    scheduleRetryAction("full-analysis");
+    restorePrimaryActions();
     updateStatus("idle", state.statusMessage);
     return;
   }
 
   elements.analyseButton.textContent = "pVACseq running...";
   setUploadStatus(`Job submitted (ID: ${jobId}). Polling for completion...`);
-  updateProgressBar(5, "pVACseq queued...");
-
-  const elapsedTimer = startElapsedTimer();
-
-  _jobPollInterval = window.setInterval(async () => {
-    try {
-      const res = await fetch(`${API_ORIGIN}/api/jobs/${jobId}`);
-      if (!res.ok) return;
-      const job = await res.json();
-
-      updateProgressBar(job.progress_pct || 5, `pVACseq ${job.status}...`);
-
-      if (job.status === "complete") {
-        stopPolling();
-        window.clearInterval(elapsedTimer);
-        updateProgressBar(100, "pVACseq complete. Loading results...");
-        setUploadStatus(`pVACseq complete for ${file.name}. Running analysis pipeline...`);
-
-        const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?job_id=${jobId}`;
-        const ok = await runBackendPipelineWithUrl(wsUrl);
-        setProgressVisible(false);
-        if (!ok) {
-          setUploadStatus("Pipeline failed after pVACseq. See console for details.", true);
-          applyFallbackRun();
-        } else {
-          setUploadStatus(`Full pVACseq analysis complete for ${file.name}.`);
-        }
-        state.loading = false;
-        elements.analyseButton.disabled = false;
-        elements.analyseButton.textContent = "Analyse My File";
-        elements.loadButton.disabled = false;
-
-      } else if (job.status === "failed") {
-        stopPolling();
-        window.clearInterval(elapsedTimer);
-        setProgressVisible(false);
-        setUploadStatus(`pVACseq failed: ${job.error_msg || "unknown error"}`, true);
-        state.loading = false;
-        elements.analyseButton.disabled = false;
-        elements.analyseButton.textContent = "Analyse My File";
-        elements.loadButton.disabled = false;
-        updateStatus("idle", state.statusMessage);
-      }
-    } catch {
-      // transient fetch error — keep polling
-    }
-  }, 30000);
+  beginFullAnalysisPolling(jobId, file.name);
 }
 
 function setUploadStatus(message, isError = false) {
   elements.uploadStatus.textContent = message;
   elements.uploadStatus.className = `upload-status ${isError ? "upload-status-error" : message ? "upload-status-info" : ""}`;
+}
+
+async function retryLastAction() {
+  if (state.loading || !state.retryAction) return;
+
+  if (state.retryAction === "demo") {
+    return loadDemo();
+  }
+
+  if (state.retryAction === "resume-full-analysis") {
+    const pending = readPendingFullAnalysis();
+    if (pending) {
+      resetRunState();
+      state.loading = true;
+      elements.analyseButton.disabled = true;
+      elements.loadButton.disabled = true;
+      elements.analyseButton.textContent = "Resuming...";
+      updateStatus("running", `Reopening completed backend job ${pending.jobId} into the workspace.`);
+      renderAll();
+      beginFullAnalysisPolling(pending.jobId, pending.fileName, {
+        startedAt: pending.startedAt,
+        initialLabel: "Reconnecting to backend job..."
+      });
+      return;
+    }
+  }
+
+  if (state.retryAction === "quick-analysis") {
+    return uploadAndRun();
+  }
+
+  if (state.retryAction === "full-analysis") {
+    return submitFullPipeline();
+  }
+}
+
+async function restorePendingFullAnalysis() {
+  const pending = readPendingFullAnalysis();
+  if (!pending || state.loading) return;
+
+  resetRunState();
+  state.loading = true;
+  elements.analyseButton.disabled = true;
+  elements.loadButton.disabled = true;
+  elements.analyseButton.textContent = "Resuming...";
+  setRetryAction("");
+  setUploadStatus(
+    `Recovered active pVACseq job ${pending.jobId} for ${pending.fileName}. Reconnecting to backend progress...`
+  );
+  updateStatus(
+    "running",
+    `Recovered backend job ${pending.jobId} after refresh. VaxAgent is reconnecting to the long-running analysis.`
+  );
+  renderAll();
+
+  beginFullAnalysisPolling(pending.jobId, pending.fileName, {
+    startedAt: pending.startedAt,
+    initialLabel: "Reconnecting to backend job..."
+  });
 }
 
 async function uploadAndRun() {
@@ -880,6 +1254,7 @@ async function uploadAndRun() {
   elements.analyseButton.disabled = true;
   elements.loadButton.disabled = true;
   elements.analyseButton.textContent = "Uploading...";
+  setRetryAction("");
   setUploadStatus("Uploading and parsing your VCF file...");
   updateStatus(
     "running",
@@ -910,10 +1285,8 @@ async function uploadAndRun() {
     elements.analyseButton.textContent = "Pipeline running...";
   } catch (err) {
     setUploadStatus(`Upload error: ${err.message}`, true);
-    state.loading = false;
-    elements.analyseButton.disabled = false;
-    elements.analyseButton.textContent = "Analyse My File";
-    elements.loadButton.disabled = false;
+    scheduleRetryAction("quick-analysis");
+    restorePrimaryActions();
     updateStatus("idle", state.statusMessage);
     return;
   }
@@ -923,13 +1296,14 @@ async function uploadAndRun() {
 
   if (!backendSucceeded) {
     setUploadStatus("Pipeline failed after upload. The benchmark fixture was loaded as a fallback.", true);
+    scheduleRetryAction("quick-analysis");
     applyFallbackRun();
   } else {
     setUploadStatus(`Analysis complete for ${file.name}.`);
+    setRetryAction("");
   }
 
-  elements.analyseButton.disabled = false;
-  elements.analyseButton.textContent = "Analyse My File";
+  restorePrimaryActions();
 }
 
 function runBackendPipeline() {
@@ -945,6 +1319,7 @@ async function loadDemo() {
   state.loading = true;
   elements.loadButton.disabled = true;
   elements.loadButton.textContent = "Loading...";
+  setRetryAction("");
   updateStatus(
     "running",
     "Trying the local backend first so the demo can use the full pipeline path."
@@ -954,12 +1329,21 @@ async function loadDemo() {
   const backendSucceeded = await runBackendPipeline();
 
   if (!backendSucceeded) {
+    scheduleRetryAction("demo");
     applyFallbackRun();
+  } else {
+    setRetryAction("");
   }
 }
 
 elements.loadButton.addEventListener("click", loadDemo);
 elements.exportButton.addEventListener("click", exportBrief);
+elements.retryLastActionButton.addEventListener("click", () => {
+  void retryLastAction();
+});
+elements.refreshHistoryButton.addEventListener("click", () => {
+  void fetchRunHistory();
+});
 
 elements.vcfFileInput.addEventListener("change", () => {
   const file = elements.vcfFileInput.files[0];
@@ -993,3 +1377,5 @@ checkDockerAvailability().then((dockerOk) => {
 
 updateStatus("idle", state.statusMessage);
 renderAll();
+void fetchRunHistory();
+void restorePendingFullAnalysis();

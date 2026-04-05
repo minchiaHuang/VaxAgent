@@ -20,6 +20,7 @@ import os
 import shutil
 import tempfile
 import uuid
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,6 +49,7 @@ JOBS_DIR.mkdir(exist_ok=True)
 PIPELINE_STEP_DELAY_SECONDS = os.getenv("PIPELINE_STEP_DELAY_SECONDS")
 
 _docker_available: bool = False
+_upload_cache_evict_task: asyncio.Task | None = None
 
 # In-memory cache for uploaded VCF parse results keyed by file_id.
 # Entries are evicted after 30 minutes via a background task.
@@ -55,10 +57,32 @@ _upload_cache: dict[str, dict] = {}
 
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global _docker_available, _upload_cache_evict_task
+
+    _docker_available = shutil.which("docker") is not None
+    await init_db()
+
+    if os.getenv("DISABLE_UPLOAD_CACHE_EVICTION", "false").lower() != "true":
+        _upload_cache_evict_task = asyncio.create_task(_evict_upload_cache())
+
+    try:
+        yield
+    finally:
+        if _upload_cache_evict_task is not None:
+            _upload_cache_evict_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await _upload_cache_evict_task
+            _upload_cache_evict_task = None
+
+
 app = FastAPI(
     title="VaxAgent Research Copilot API",
     description="Explainable oncology research workflow backend",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -68,16 +92,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    global _docker_available
-    _docker_available = shutil.which("docker") is not None
-    await init_db()
-    if os.getenv("DISABLE_UPLOAD_CACHE_EVICTION", "false").lower() != "true":
-        asyncio.create_task(_evict_upload_cache())
-
 
 async def _evict_upload_cache() -> None:
     """Remove upload cache entries older than 30 minutes every 5 minutes."""

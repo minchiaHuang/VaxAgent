@@ -24,6 +24,7 @@ backend/*.db
 
 # Generated reports (runtime output)
 backend/reports/*.pdf
+backend/jobs/
 
 # macOS
 .DS_Store

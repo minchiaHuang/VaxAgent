@@ -89,6 +89,11 @@
           </p>
         </div>
         <p id="upload-status" class="upload-status"></p>
+        <div class="upload-actions">
+          <button id="retry-last-action" class="secondary-button" hidden>
+            Retry Last Action
+          </button>
+        </div>
       </section>
 
       <main class="dashboard">
@@ -98,6 +103,22 @@
             <h2>Single happy-path workflow</h2>
           </div>
           <ol id="stepper" class="stepper"></ol>
+        </section>
+
+        <section class="panel history-panel">
+          <div class="history-header">
+            <div>
+              <p class="section-kicker">Recent Runs</p>
+              <h2>Run history and reports</h2>
+            </div>
+            <button id="refresh-history" class="secondary-button">Refresh History</button>
+          </div>
+          <p id="history-status" class="history-status">
+            Run history appears when the backend is connected.
+          </p>
+          <div id="history-list" class="history-list empty-state">
+            No backend run history yet.
+          </div>
         </section>
 
         <section class="panel">

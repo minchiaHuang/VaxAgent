@@ -586,6 +586,16 @@ h2 {
   color: var(--accent);
 }
 
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.upload-actions [hidden] {
+  display: none;
+}
+
 /* ── Mode toggle ──────────────────────────────────────────────────────── */
 
 .mode-toggle {
@@ -685,6 +695,83 @@ h2 {
   line-height: 1.5;
 }
 
+/* ── Run history ──────────────────────────────────────────────────────── */
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.history-status {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.history-card.is-active {
+  border-color: rgba(32, 75, 87, 0.3);
+  background: rgba(32, 75, 87, 0.08);
+}
+
+.history-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.history-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.history-pill {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(27, 26, 22, 0.06);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.history-actions .secondary-button,
+.history-actions .primary-button {
+  min-width: 120px;
+}
+
 /* ── Responsive: upload panel ─────────────────────────────────────────── */
 
 @media (max-width: 980px) {
@@ -723,6 +810,16 @@ h2 {
   .upload-fields {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .history-header,
+  .history-card {
+    grid-template-columns: 1fr;
+  }
+
+  .history-actions,
+  .upload-actions {
+    justify-content: stretch;
   }
 
   .file-label-text {

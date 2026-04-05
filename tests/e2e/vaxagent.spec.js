@@ -29,6 +29,7 @@ test("backend happy path completes and supports candidate selection", async ({ p
   await expect(page.locator(".stepper-item.is-complete")).toHaveCount(6);
   await expect(page.locator("#candidate-list .candidate-card")).toHaveCount(10);
   await expect(page.getByRole("button", { name: "Export Brief" })).toBeEnabled();
+  await expect(page.locator("#history-list")).toContainText("HCC1395 Breast Cancer Cell Line");
 
   await page.locator('[data-rank="2"]').click();
   await expect(page.locator("#explanation-card")).toContainText("PIK3CA E545K ranks #2");
@@ -46,6 +47,11 @@ test("quick upload path uses uploaded filename and completes analysis", async ({
   await expect(page.locator("#summary-grid .summary-card")).toHaveCount(4);
   await expect(page.locator("#candidate-list .candidate-card")).toHaveCount(10);
   await expect(page.locator("#upload-status")).toContainText("Analysis complete");
+  await expect(page.locator("#history-list")).toContainText("test_small.vcf");
+
+  const uploadedRun = page.locator('.history-card:has-text("test_small.vcf")').first();
+  await uploadedRun.getByRole("button", { name: "Reopen Run" }).click();
+  await expect(page.locator("#dataset-title")).toHaveText("test_small.vcf");
 });
 
 test("full analysis mode can be enabled for UI validation", async ({ page }) => {
