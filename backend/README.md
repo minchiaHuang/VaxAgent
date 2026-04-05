@@ -27,6 +27,19 @@ After startup, the backend path should satisfy all of these:
 4. `/api/runs` shows the new run
 5. `/api/runs/{run_id}/report` returns a PDF
 
+## Tests
+
+```bash
+cd backend
+.venv/bin/python -m pytest
+```
+
+The backend test suite covers:
+
+- REST endpoints for health, uploads, jobs, runs, and report download
+- WebSocket pipeline happy path and job/file error branches
+- VCF parsing, pVACseq TSV parsing and ranking, mRNA blueprint generation, report export, orchestrator fallback, and SQLite persistence
+
 ## WebSocket demo
 
 ```js

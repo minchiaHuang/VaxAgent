@@ -1,0 +1,12 @@
+{
+  "name": "vaxagent-mvp",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:backend && npm run test:e2e",
+    "test:backend": "cd backend && .venv/bin/python -m pytest",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}

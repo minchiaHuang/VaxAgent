@@ -43,8 +43,9 @@ from pipeline.pvacseq_runner import (
 from pipeline.report_generator import generate_pdf
 from pipeline.vcf_parser import load_variant_stats_fixture, parse_vcf_live_force
 
-JOBS_DIR = Path(__file__).parent / "jobs"
+JOBS_DIR = Path(os.getenv("JOBS_DIR", Path(__file__).parent / "jobs"))
 JOBS_DIR.mkdir(exist_ok=True)
+PIPELINE_STEP_DELAY_SECONDS = os.getenv("PIPELINE_STEP_DELAY_SECONDS")
 
 _docker_available: bool = False
 
@@ -74,7 +75,8 @@ async def startup() -> None:
     global _docker_available
     _docker_available = shutil.which("docker") is not None
     await init_db()
-    asyncio.create_task(_evict_upload_cache())
+    if os.getenv("DISABLE_UPLOAD_CACHE_EVICTION", "false").lower() != "true":
+        asyncio.create_task(_evict_upload_cache())
 
 
 async def _evict_upload_cache() -> None:
@@ -85,6 +87,13 @@ async def _evict_upload_cache() -> None:
         stale = [k for k, v in _upload_cache.items() if v.get("_uploaded_at", 0) < cutoff]
         for k in stale:
             _upload_cache.pop(k, None)
+
+
+async def _step_sleep(default_seconds: float) -> None:
+    if PIPELINE_STEP_DELAY_SECONDS is None:
+        await asyncio.sleep(default_seconds)
+        return
+    await asyncio.sleep(float(PIPELINE_STEP_DELAY_SECONDS))
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +188,7 @@ async def upload_vcf(
 @app.post("/api/jobs/pvacseq")
 async def submit_pvacseq_job(
     vcf_file: UploadFile = File(...),
-    hla_alleles: str = Form(...),
+    hla_alleles: str = Form(""),
 ) -> JSONResponse:
     """Accept a VCF upload and HLA alleles, start a real pVACseq Docker job."""
     if not _docker_available:
@@ -289,7 +298,7 @@ async def pipeline_ws(
     try:
         # ── Step 1: Load dataset ──────────────────────────────────────────
         await _send(websocket, "load_dataset", "running", run_id=run_id)
-        await asyncio.sleep(0.3)
+        await _step_sleep(0.3)
 
         if file_id and file_id in _upload_cache:
             variant_stats = {k: v for k, v in _upload_cache[file_id].items() if not k.startswith("_")}
@@ -307,7 +316,7 @@ async def pipeline_ws(
 
         # ── Step 2: pVACseq candidate loading ────────────────────────────
         await _send(websocket, "pvacseq", "running", run_id=run_id)
-        await asyncio.sleep(0.5)
+        await _step_sleep(0.5)
 
         if job_candidates is not None:
             raw_candidates = job_candidates
@@ -341,7 +350,7 @@ async def pipeline_ws(
 
         # ── Step 3: Rank and filter ───────────────────────────────────────
         await _send(websocket, "ranking", "running", run_id=run_id)
-        await asyncio.sleep(0.4)
+        await _step_sleep(0.4)
 
         ranked = rank_candidates(raw_candidates, top_n=10)
         top = ranked[0] if ranked else {}
@@ -362,7 +371,7 @@ async def pipeline_ws(
 
         # ── Step 4: ESMFold structure enrichment ─────────────────────────
         await _send(websocket, "esmfold", "running", run_id=run_id)
-        await asyncio.sleep(0.3)
+        await _step_sleep(0.3)
 
         enriched = await enrich_candidates_with_structure(ranked[:5])
         explanation = await explain_step("esmfold", {})
@@ -386,7 +395,7 @@ async def pipeline_ws(
 
         # ── Step 5: mRNA construct design ────────────────────────────────
         await _send(websocket, "mrna_design", "running", run_id=run_id)
-        await asyncio.sleep(0.4)
+        await _step_sleep(0.4)
 
         blueprint = design_construct(ranked, top_n=5)
         explanation = await explain_step("mrna_design", blueprint)
@@ -401,7 +410,7 @@ async def pipeline_ws(
 
         # ── Step 6: PDF report ───────────────────────────────────────────
         await _send(websocket, "report", "running", run_id=run_id)
-        await asyncio.sleep(0.3)
+        await _step_sleep(0.3)
 
         # Attach explanations to top candidates before PDF generation
         for c in ranked[:3]:

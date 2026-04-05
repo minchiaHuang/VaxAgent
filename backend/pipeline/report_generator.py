@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -26,7 +26,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-REPORTS_DIR = Path(__file__).parent.parent / "reports"
+REPORTS_DIR = Path(os.getenv("REPORTS_DIR", Path(__file__).parent.parent / "reports"))
 REPORTS_DIR.mkdir(exist_ok=True)
 
 ACCENT = colors.HexColor("#8f2d1d")
@@ -50,6 +50,7 @@ def generate_pdf(
         leftMargin=0.8 * inch,
         topMargin=0.8 * inch,
         bottomMargin=0.8 * inch,
+        pageCompression=0,
     )
 
     styles = getSampleStyleSheet()
@@ -90,7 +91,7 @@ def generate_pdf(
     story.append(
         Paragraph(
             f"Run ID: {run_id} &nbsp;&nbsp;|&nbsp;&nbsp; "
-            f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+            f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
             small_style,
         )
     )

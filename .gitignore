@@ -38,6 +38,8 @@ backend/reports/*.pdf
 
 # Node (if frontend tooling added later)
 node_modules/
+playwright-report/
+test-results/
 
 # Logs
 *.log

@@ -1,7 +1,9 @@
 const _isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const QUERY_PARAMS = new URLSearchParams(window.location.search);
 const API_ORIGIN =
-  new URLSearchParams(window.location.search).get("api") ||
+  QUERY_PARAMS.get("api") ||
   (_isLocal ? "http://127.0.0.1:8000" : "https://vaxagentvaxagent-backend.onrender.com");
+const PIPELINE_CONNECT_TIMEOUT_MS = Number(QUERY_PARAMS.get("timeout_ms")) || 8000;
 const WS_URL = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline`;
 
 const PIPELINE_STEPS = [
@@ -633,7 +635,7 @@ function runBackendPipelineWithUrl(wsUrl) {
         state.ws = null;
       }
       resolve(false);
-    }, 8000);
+    }, PIPELINE_CONNECT_TIMEOUT_MS);
 
     try {
       state.ws = new WebSocket(wsUrl);

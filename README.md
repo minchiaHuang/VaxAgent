@@ -117,6 +117,31 @@ Expected live behavior:
 - kept docs do not contradict each other
 - no outdated or duplicate project docs remain
 
+## Test Automation
+
+Frontend and backend both have automated coverage now.
+
+```bash
+# backend tests
+cd backend
+.venv/bin/python -m pytest
+
+# browser E2E tests
+cd ..
+npx playwright install chromium
+npx playwright test
+
+# combined entrypoint
+npm test
+```
+
+Coverage includes:
+
+- backend REST and WebSocket happy paths
+- upload and pVACseq job error handling
+- pipeline scoring, VCF parsing, mRNA design, PDF generation, and persistence
+- frontend fallback flow, backend-connected flow, quick upload flow, and guardrail UI
+
 ## Success Definition
 
 This project is `Handoff Ready` when:
