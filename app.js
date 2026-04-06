@@ -848,7 +848,7 @@ function exportBrief() {
   URL.revokeObjectURL(url);
 }
 
-function runBackendPipelineWithUrl(wsUrl) {
+function runBackendPipelineWithUrl(wsUrl, timeoutMs = PIPELINE_CONNECT_TIMEOUT_MS) {
   return new Promise((resolve) => {
     let settled = false;
     let sawAnyMessage = false;
@@ -862,7 +862,7 @@ function runBackendPipelineWithUrl(wsUrl) {
         state.ws = null;
       }
       resolve(false);
-    }, PIPELINE_CONNECT_TIMEOUT_MS);
+    }, timeoutMs);
 
     try {
       state.ws = new WebSocket(wsUrl);
@@ -881,8 +881,13 @@ function runBackendPipelineWithUrl(wsUrl) {
 
     state.ws.onmessage = (event) => {
       sawAnyMessage = true;
-      const message = JSON.parse(event.data);
-      applyPipelineMessage(message);
+      let message;
+      try {
+        message = JSON.parse(event.data);
+        applyPipelineMessage(message);
+      } catch (_parseErr) {
+        return;
+      }
 
       if (message.status === "error") {
         window.clearTimeout(timeout);
@@ -1019,7 +1024,7 @@ async function startCompletedJobPipeline(jobId, fileName) {
   setUploadStatus(`pVACseq complete for ${fileName}. Running analysis pipeline...`);
 
   const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?job_id=${jobId}`;
-  const ok = await runBackendPipelineWithUrl(wsUrl);
+  const ok = await runBackendPipelineWithUrl(wsUrl, 60000);
   setProgressVisible(false);
 
   if (!ok) {
