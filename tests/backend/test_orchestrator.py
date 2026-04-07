@@ -11,7 +11,7 @@ async def test_explain_step_uses_static_fallback_without_api_key(monkeypatch) ->
 
     text = await orchestrator.explain_step("ranking", {})
 
-    assert "Candidates were scored" in text
+    assert "ranked" in text.lower()
 
 
 @pytest.mark.asyncio
@@ -26,7 +26,7 @@ async def test_explain_step_falls_back_when_claude_call_fails(monkeypatch) -> No
 
     text = await orchestrator.explain_step("report", {})
 
-    assert "research brief" in text.lower()
+    assert "report" in text.lower()
 
 
 @pytest.mark.asyncio

@@ -44,3 +44,19 @@ test-results/
 
 # Logs
 *.log
+
+# Claude Code internal state
+.claude/
+
+# OpenSpec workflow state
+openspec/
+
+# Downloaded data (large files fetched by scripts/download_data.py)
+data/downloads/
+
+# E2E test artifacts
+tests/e2e/*.pdf
+
+# Windows
+desktop.ini
+Thumbs.db

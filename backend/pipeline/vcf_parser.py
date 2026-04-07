@@ -11,12 +11,12 @@ import json
 import os
 from pathlib import Path
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+BENCHMARKS_DIR = Path(__file__).parent.parent.parent / "data" / "benchmarks"
 USE_FIXTURES = os.getenv("USE_FIXTURES", "true").lower() == "true"
 
 
 def load_variant_stats_fixture(dataset_id: str = "hcc1395") -> dict:
-    path = FIXTURES_DIR / "variant_stats.json"
+    path = BENCHMARKS_DIR / dataset_id / "variant_stats.json"
     with open(path) as f:
         return json.load(f)
 

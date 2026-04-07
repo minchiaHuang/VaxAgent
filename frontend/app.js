@@ -1,3 +1,5 @@
+/* ── Configuration ────────────────────────────────────────────────────── */
+
 const _isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const QUERY_PARAMS = new URLSearchParams(window.location.search);
 const API_ORIGIN =
@@ -8,51 +10,95 @@ const JOB_POLL_INTERVAL_MS = Number(QUERY_PARAMS.get("job_poll_ms")) || 10000;
 const WS_URL = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline`;
 const PENDING_FULL_ANALYSIS_KEY = "vaxagent.pendingFullAnalysis";
 
+/* ── Pipeline steps (backend) ────────────────────────────────────────── */
+
 const PIPELINE_STEPS = [
-  {
-    key: "load_dataset",
-    title: "Load dataset",
-    detail: "Open one benchmark mutation case and summarize the mutation landscape."
-  },
-  {
-    key: "pvacseq",
-    title: "Predict candidates",
-    detail: "Load the precomputed neoantigen shortlist for the benchmark sample."
-  },
-  {
-    key: "ranking",
-    title: "Rank shortlist",
-    detail: "Score binding, expression, clonality, and mutant specificity."
-  },
-  {
-    key: "esmfold",
-    title: "Add structure context",
-    detail: "Add surface-accessibility context for the top-ranked candidates."
-  },
-  {
-    key: "mrna_design",
-    title: "Draft blueprint",
-    detail: "Assemble a research-only mRNA construct preview from the shortlist."
-  },
-  {
-    key: "report",
-    title: "Export report",
-    detail: "Generate one concise brief for review and sharing."
-  }
+  { key: "load_dataset", title: "Loading tumor data", detail: "Reading mutation profile..." },
+  { key: "pvacseq", title: "Finding targets", detail: "Scanning for vaccine target candidates..." },
+  { key: "ranking", title: "Ranking targets", detail: "Scoring by immune recognition potential..." },
+  { key: "esmfold", title: "Checking structure", detail: "Verifying targets are reachable by the immune system..." },
+  { key: "mrna_design", title: "Designing vaccine", detail: "Assembling vaccine blueprint..." },
+  { key: "report", title: "Creating report", detail: "Generating your downloadable report..." }
 ];
+
+/* ── Wizard steps ────────────────────────────────────────────────────── */
+
+const WIZARD_STEPS = [
+  { id: 1, key: "diagnosis", title: "Diagnosis", label: "Tell us about the diagnosis" },
+  { id: 2, key: "upload", title: "Upload", label: "Upload your tumor data" },
+  { id: 3, key: "candidates", title: "Targets", label: "Your top vaccine targets" },
+  { id: 4, key: "blueprint", title: "Blueprint", label: "Your vaccine blueprint" },
+  { id: 5, key: "next_steps", title: "Next Steps", label: "What to do next" }
+];
+
+/* ── Sequencing guidance by cancer type ───────────────────────────────── */
+
+const SEQUENCING_GUIDANCE = {
+  lymphoma: {
+    name: "Lymphoma",
+    note: "Lymphoma often has enough mutations for vaccine target discovery. Whole Exome Sequencing (WES) is typically recommended.",
+    sequencing: "Whole Exome Sequencing (WES)",
+    mutations: "Moderate to high"
+  },
+  osteosarcoma: {
+    name: "Osteosarcoma",
+    note: "Osteosarcoma can have complex mutations. Whole Genome Sequencing (WGS) may find more targets, but WES is also effective.",
+    sequencing: "WES or WGS",
+    mutations: "Moderate"
+  },
+  mast_cell_tumor: {
+    name: "Mast cell tumor",
+    note: "Mast cell tumors often involve specific gene mutations (like c-KIT). Targeted panels or WES can both work well.",
+    sequencing: "WES or targeted panel",
+    mutations: "Low to moderate"
+  },
+  melanoma: {
+    name: "Melanoma",
+    note: "Melanoma typically has a high mutation burden, making it one of the best candidates for personalized vaccine approaches.",
+    sequencing: "WES",
+    mutations: "High"
+  },
+  hemangiosarcoma: {
+    name: "Hemangiosarcoma",
+    note: "Hemangiosarcoma has a moderate mutation burden. WES is the standard approach for identifying vaccine targets.",
+    sequencing: "WES",
+    mutations: "Moderate"
+  },
+  soft_tissue_sarcoma: {
+    name: "Soft tissue sarcoma",
+    note: "Soft tissue sarcomas vary widely in mutation burden. WES provides the broadest view of potential targets.",
+    sequencing: "WES",
+    mutations: "Variable"
+  },
+  mammary_carcinoma: {
+    name: "Mammary carcinoma",
+    note: "Mammary tumors in pets can have a moderate-to-high mutation burden, similar to some human breast cancers.",
+    sequencing: "WES",
+    mutations: "Moderate to high"
+  },
+  transitional_cell_carcinoma: {
+    name: "Transitional cell carcinoma",
+    note: "Bladder tumors can harbor enough mutations for vaccine target discovery. WES is recommended.",
+    sequencing: "WES",
+    mutations: "Moderate"
+  },
+  other: {
+    name: "Other cancer type",
+    note: "For less common cancers, Whole Exome Sequencing (WES) provides the broadest coverage for discovering potential vaccine targets. Ask your vet about the expected mutation burden.",
+    sequencing: "WES",
+    mutations: "Varies"
+  }
+};
+
+/* ── Fallback fixture ────────────────────────────────────────────────── */
 
 const FALLBACK_RUN = {
   variantStats: {
     dataset_id: "hcc1395",
-    dataset_name: "HCC1395 Breast Cancer Cell Line",
-    source: "Precomputed benchmark fixture embedded in the frontend for offline demo fallback.",
-    tumor_type: "Triple-negative breast cancer",
-    hla_alleles: [
-      "HLA-A*29:02",
-      "HLA-B*45:01",
-      "HLA-B*82:02",
-      "HLA-C*06:02"
-    ],
+    dataset_name: "Demo Case — Breast Cancer Cell Line (HCC1395)",
+    source: "Precomputed benchmark dataset for demonstration purposes.",
+    tumor_type: "Triple-negative breast cancer (cell line)",
+    hla_alleles: ["HLA-A*29:02", "HLA-B*45:01", "HLA-B*82:02", "HLA-C*06:02"],
     stats: {
       total_variants: 4741,
       missense_mutations: 1842,
@@ -63,103 +109,59 @@ const FALLBACK_RUN = {
   },
   candidates: [
     {
-      rank: 1,
-      gene: "TP53",
-      mutation: "R248W",
-      mt_epitope_seq: "SVVVPWEPPL",
-      hla_allele: "HLA-A*29:02",
-      ic50_mt: 45.2,
-      fold_change: 217.7,
-      gene_expression_tpm: 38.2,
-      tumor_dna_vaf: 0.48,
-      clonality: "clonal",
-      priority_score: 76,
-      plddt: 82.4,
-      surface_accessible: true
+      rank: 1, gene: "TP53", mutation: "R248W", mt_epitope_seq: "SVVVPWEPPL",
+      hla_allele: "HLA-A*29:02", ic50_mt: 45.2, fold_change: 217.7,
+      gene_expression_tpm: 38.2, tumor_dna_vaf: 0.48, clonality: "clonal",
+      priority_score: 76, plddt: 82.4, surface_accessible: true
     },
     {
-      rank: 2,
-      gene: "PIK3CA",
-      mutation: "E545K",
-      mt_epitope_seq: "IKDFSKIVSL",
-      hla_allele: "HLA-B*45:01",
-      ic50_mt: 78.6,
-      fold_change: 79.1,
-      gene_expression_tpm: 31.5,
-      tumor_dna_vaf: 0.42,
-      clonality: "clonal",
-      priority_score: 70,
-      plddt: 78.9,
-      surface_accessible: true
+      rank: 2, gene: "PIK3CA", mutation: "E545K", mt_epitope_seq: "IKDFSKIVSL",
+      hla_allele: "HLA-B*45:01", ic50_mt: 78.6, fold_change: 79.1,
+      gene_expression_tpm: 31.5, tumor_dna_vaf: 0.42, clonality: "clonal",
+      priority_score: 70, plddt: 78.9, surface_accessible: true
     },
     {
-      rank: 3,
-      gene: "BRCA1",
-      mutation: "T1685I",
-      mt_epitope_seq: "QMFISVVNL",
-      hla_allele: "HLA-A*29:02",
-      ic50_mt: 124.3,
-      fold_change: 36.7,
-      gene_expression_tpm: 18.7,
-      tumor_dna_vaf: 0.39,
-      clonality: "clonal",
-      priority_score: 60,
-      plddt: 74.2,
-      surface_accessible: true
+      rank: 3, gene: "BRCA1", mutation: "T1685I", mt_epitope_seq: "QMFISVVNL",
+      hla_allele: "HLA-A*29:02", ic50_mt: 124.3, fold_change: 36.7,
+      gene_expression_tpm: 18.7, tumor_dna_vaf: 0.39, clonality: "clonal",
+      priority_score: 60, plddt: 74.2, surface_accessible: true
     },
     {
-      rank: 4,
-      gene: "PTEN",
-      mutation: "R130Q",
-      mt_epitope_seq: "KMLQQDKMF",
-      hla_allele: "HLA-B*45:01",
-      ic50_mt: 198.4,
-      fold_change: 19.2,
-      gene_expression_tpm: 22.4,
-      tumor_dna_vaf: 0.35,
-      clonality: "clonal",
-      priority_score: 54,
-      plddt: 68.1,
-      surface_accessible: false
+      rank: 4, gene: "PTEN", mutation: "R130Q", mt_epitope_seq: "KMLQQDKMF",
+      hla_allele: "HLA-B*45:01", ic50_mt: 198.4, fold_change: 19.2,
+      gene_expression_tpm: 22.4, tumor_dna_vaf: 0.35, clonality: "clonal",
+      priority_score: 54, plddt: 68.1, surface_accessible: false
     },
     {
-      rank: 5,
-      gene: "RB1",
-      mutation: "R698W",
-      mt_epitope_seq: "LFMDLWRWL",
-      hla_allele: "HLA-A*29:02",
-      ic50_mt: 267.1,
-      fold_change: 11.0,
-      gene_expression_tpm: 15.2,
-      tumor_dna_vaf: 0.31,
-      clonality: "subclonal",
-      priority_score: 45,
-      plddt: 71.5,
-      surface_accessible: true
+      rank: 5, gene: "RB1", mutation: "R698W", mt_epitope_seq: "LFMDLWRWL",
+      hla_allele: "HLA-A*29:02", ic50_mt: 267.1, fold_change: 11.0,
+      gene_expression_tpm: 15.2, tumor_dna_vaf: 0.31, clonality: "subclonal",
+      priority_score: 45, plddt: 71.5, surface_accessible: true
     }
   ],
   blueprint: {
     construct_id: "MRNA-HCC1395-DRAFT-01",
-    strategy: "Multi-epitope long-peptide cassette (5 antigens)",
+    strategy: "Multi-target vaccine using 5 candidates",
     format: "Research-only blueprint preview",
     payload_summary:
-      "m7GpppN | 5' UTR | Signal peptide | TP53 R248W cassette | PIK3CA E545K cassette | BRCA1 T1685I cassette | PTEN R130Q cassette | RB1 R698W cassette | 3' UTR | Poly(A)×120",
+      "5' Cap | 5' UTR | Signal peptide | TP53 target | PIK3CA target | BRCA1 target | PTEN target | RB1 target | 3' UTR | Poly(A) tail",
     total_length_nt: 450,
+    antigen_count: 5,
     notes: [
-      "Sequence is a simplified research preview, not a validated therapeutic design.",
-      "Antigen ordering follows the shortlist ranking to keep the story easy to explain.",
-      "Wet-lab validation and delivery design remain out of scope."
+      "This is a simplified research preview, not a validated therapeutic design.",
+      "Targets are ordered by priority score — strongest first.",
+      "Wet-lab validation and delivery design are required before any synthesis."
     ],
     sequence_preview: [
-      "5' Cap:        m7GpppN",
-      "5' UTR:        GGGAATTCTAGGCTAACTGCTGGAGCTCTTCTCCACC...",
-      "Signal:        ATGGAGACCCCCCAGCTGCTCTTC...",
-      "Ag1 (TP53 R248W): AGCGTGGTCGTGCCCTGGGAGCCCCCCTTG",
-      "Linker:        GGCCCCGGCCCCGGG",
-      "Ag2 (PIK3CA E545K): ATCAAGGACTTCTCCAAGATCGTGAGCCTG",
-      "Stop:          TGA",
-      "3' UTR:        TGAATCAGAGCAGAAAGCTCATGAGCCAGAAGTCTG...",
-      "Poly(A):       AAAAAAAAAAAAAAAAAAAA...×120"
+      "5' Cap:           m7GpppN",
+      "5' UTR:           GGGAATTCTAGGCTAACTGCTGGAGCTCTTCTCCACC...",
+      "Signal:           ATGGAGACCCCCCAGCTGCTCTTC...",
+      "Target 1 (TP53):  AGCGTGGTCGTGCCCTGGGAGCCCCCCTTG",
+      "Linker:           GGCCCCGGCCCCGGG",
+      "Target 2 (PIK3CA): ATCAAGGACTTCTCCAAGATCGTGAGCCTG",
+      "Stop:             TGA",
+      "3' UTR:           TGAATCAGAGCAGAAAGCTCATGAGCCAGAAGTCTG...",
+      "Poly(A):          AAAAAAAAAAAAAAAAAAAA...x120"
     ].join("\n"),
     segments: [
       { type: "cap", label: "5' Cap" },
@@ -181,44 +183,49 @@ const FALLBACK_RUN = {
   },
   explanations: {
     load_dataset:
-      "We loaded the HCC1395 benchmark dataset, a triple-negative breast cancer cell line with a high mutation burden. That gives the workflow enough altered protein sequences to build a believable neoantigen shortlist for demo purposes.",
+      "We loaded a demonstration dataset from a well-studied cancer cell line with a high number of mutations — giving us plenty of potential vaccine targets to work with.",
     pvacseq:
-      "The shortlist comes from precomputed binding predictions instead of a live pVACseq run. This keeps the demo deterministic while still showing the kind of candidate filtering a real workflow would perform.",
+      "We scanned all the protein changes caused by mutations and tested which ones the immune system's receptors could grab onto tightly enough to trigger a response. Out of 322 possibilities, 78 passed the first filter.",
     ranking:
-      "Candidates are ranked by combining predicted binding strength, tumor expression, variant allele frequency, and mutant-vs-wildtype specificity. The goal is not to claim biological truth, but to make the prioritization logic explicit and easy to discuss.",
+      "We ranked the remaining targets by combining four factors: how tightly the immune system can grab them, how actively the tumor produces them, how common they are across tumor cells, and how different they are from normal proteins.",
     esmfold:
-      "Surface-accessibility context is included as a lightweight structural signal. It adds one more explainable research feature without introducing a fragile live dependency.",
+      "We checked whether each target protein fragment is physically accessible on the cell surface — if the immune system can't reach it, it won't work as a vaccine target.",
     mrna_design:
-      "The draft construct preview assembles the top candidates into one research-only mRNA blueprint. It is a communication aid for the demo, not a manufacturable therapeutic design.",
+      "We assembled the top 5 targets into a single vaccine blueprint — a design that could teach the immune system to recognize all five targets at once.",
     report:
-      "The export step packages the same summary, shortlist, and blueprint preview into one concise brief for sharing."
+      "We packaged everything into a downloadable report you can share with your veterinarian."
   },
   limitations: [
-    "Single synthetic benchmark dataset only.",
-    "Deterministic fixture-based ranking, not a live neoantigen pipeline.",
-    "Draft construct preview is for research discussion only.",
-    "Human expert review is required before any downstream scientific use."
+    "This demo uses a pre-computed benchmark dataset, not your pet's actual data.",
+    "Target rankings are computational predictions — they require lab validation.",
+    "The vaccine blueprint is a research preview, not a ready-to-manufacture design.",
+    "Always consult a qualified veterinary oncologist before pursuing treatment."
   ]
 };
 
+/* ── Application state ───────────────────────────────────────────────── */
+
 const state = {
+  // Wizard
+  wizardStep: 1,
+  maxUnlockedStep: 1,
+  diagnosis: { species: "", cancerType: "", cancerTypeCustom: "", stage: "", treatmentHistory: "" },
+
+  // Pipeline data
   loaded: false,
   loading: false,
   mode: "idle",
-  statusMessage:
-    "The load action will try the local backend first and fall back to the embedded benchmark fixture if the API is unavailable.",
+  statusMessage: "",
   variantStats: null,
   candidates: [],
   blueprint: null,
   selectedCandidateRank: null,
   reportUrl: "",
   currentRunId: "",
-  stepStatuses: Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "pending"])),
+  stepStatuses: Object.fromEntries(PIPELINE_STEPS.map((s) => [s.key, "pending"])),
   stepExplanations: {},
+  stepRawMessages: {},
   ws: null,
-  historyRuns: [],
-  historyStatus: "Run history appears when the backend is connected.",
-  historyLoading: false,
   activeJob: null,
   retryAction: "",
   // Visual Explorer state
@@ -229,37 +236,70 @@ const state = {
   fetchingExplanation: false
 };
 
+let _analysisMode = "quick";
+let _jobPollInterval = null;
+let _jobStartTime = null;
+let _jobElapsedInterval = null;
+let _jobPollErrorCount = 0;
+
+/* ── DOM references ──────────────────────────────────────────────────── */
+
 const elements = {
-  loadButton: document.getElementById("load-demo"),
-  exportButton: document.getElementById("export-brief"),
-  stepper: document.getElementById("stepper"),
-  datasetTitle: document.getElementById("dataset-title"),
-  datasetBanner: document.getElementById("dataset-banner"),
-  summaryGrid: document.getElementById("summary-grid"),
-  summaryNote: document.getElementById("summary-note"),
-  candidateList: document.getElementById("candidate-list"),
-  explanationCard: document.getElementById("explanation-card"),
-  blueprintCard: document.getElementById("blueprint-card"),
-  limitationsList: document.getElementById("limitations-list"),
+  // Wizard shell
+  progressSteps: document.getElementById("wizard-progress-steps"),
+  wizardBack: document.getElementById("wizard-back"),
+  wizardNext: document.getElementById("wizard-next"),
   modeChip: document.getElementById("mode-chip"),
-  pipelineStatus: document.getElementById("pipeline-status"),
+
+  // Step 1
+  speciesSelector: document.getElementById("species-selector"),
+  cancerTypeSelect: document.getElementById("cancer-type-select"),
+  cancerTypeCustom: document.getElementById("cancer-type-custom"),
+  stageInput: document.getElementById("stage-input"),
+  sequencingGuidance: document.getElementById("sequencing-guidance"),
+  sequencingGuidanceContent: document.getElementById("sequencing-guidance-content"),
+
+  // Step 2
+  dropZone: document.getElementById("drop-zone"),
   vcfFileInput: document.getElementById("vcf-file-input"),
+  fileLabelText: document.getElementById("file-label-text"),
   hlaAllelesInput: document.getElementById("hla-alleles-input"),
   analyseButton: document.getElementById("analyse-button"),
-  uploadStatus: document.getElementById("upload-status"),
-  fileLabelText: document.getElementById("file-label-text"),
-  modeQuickBtn: document.getElementById("mode-quick"),
-  modeFullBtn: document.getElementById("mode-full"),
-  modeDescription: document.getElementById("mode-description"),
+  tryDemoButton: document.getElementById("try-demo"),
+  pipelineProgress: document.getElementById("pipeline-progress"),
+  pipelineStatus: document.getElementById("pipeline-status"),
+  progressBar: document.getElementById("progress-bar"),
+  pipelineStepsMini: document.getElementById("pipeline-steps-mini"),
   jobProgressArea: document.getElementById("job-progress-area"),
   jobProgressLabel: document.getElementById("job-progress-label"),
   jobElapsed: document.getElementById("job-elapsed"),
-  progressBar: document.getElementById("progress-bar"),
+  jobProgressBar: document.getElementById("job-progress-bar"),
   jobProgressNote: document.getElementById("job-progress-note"),
-  retryLastActionButton: document.getElementById("retry-last-action"),
-  refreshHistoryButton: document.getElementById("refresh-history"),
-  historyStatus: document.getElementById("history-status"),
-  historyList: document.getElementById("history-list"),
+  uploadStatus: document.getElementById("upload-status"),
+
+  // Step 3
+  summaryBar: document.getElementById("summary-bar"),
+  summaryGrid: document.getElementById("summary-grid"),
+  candidateList: document.getElementById("candidate-list"),
+  rawCandidatesArea: document.getElementById("raw-candidates-area"),
+  toggleRawCandidates: document.getElementById("toggle-raw-candidates"),
+  rawCandidatesBlock: document.getElementById("raw-candidates-block"),
+
+  // Step 4
+  blueprintCard: document.getElementById("blueprint-card"),
+  blueprintActions: document.getElementById("blueprint-actions"),
+  exportButton: document.getElementById("export-brief"),
+  toggleTechnical: document.getElementById("toggle-technical"),
+  technicalDetails: document.getElementById("technical-details"),
+  sequenceBlock: document.getElementById("sequence-block"),
+  rawBlueprintArea: document.getElementById("raw-blueprint-area"),
+  toggleRawBlueprint: document.getElementById("toggle-raw-blueprint"),
+  rawBlueprintBlock: document.getElementById("raw-blueprint-block"),
+
+  // Step 5
+  vetLetterText: document.getElementById("vet-letter-text"),
+  copyLetterButton: document.getElementById("copy-letter"),
+
   // Visual Explorer elements
   stepCandidates: document.getElementById("step-candidates"),
   stepBlueprint: document.getElementById("step-blueprint"),
@@ -282,23 +322,39 @@ const elements = {
   explorerStaticCards: document.getElementById("explorer-static-cards"),
   constructViz: document.getElementById("construct-viz"),
   constructSvgWrap: document.getElementById("construct-svg-wrap"),
-  constructExplanation: document.getElementById("construct-explanation"),
-  legacyCandidates: document.getElementById("legacy-candidates"),
-  legacyExplanationLayout: document.getElementById("legacy-explanation-layout")
+  constructExplanation: document.getElementById("construct-explanation")
 };
 
-const MODE_DESCRIPTIONS = {
-  quick:
-    "Upload a <code>.vcf</code> or <code>.vcf.gz</code> tumor mutation file. The variant summary will reflect your file. Neoantigen candidate ranking uses the HCC1395 benchmark fixture — live pVACseq is outside this demo scope.",
-  full:
-    "Upload a <code>.vcf</code> or <code>.vcf.gz</code> file and provide HLA alleles. pVACseq will run inside Docker and produce real neoantigen predictions. This takes <strong>30–60 minutes</strong> — Docker must be installed and running."
-};
+/* ── Jargon translation ──────────────────────────────────────────────── */
 
-let _analysisMode = "quick";
-let _jobPollInterval = null;
-let _jobStartTime = null;
-let _jobElapsedInterval = null;
-let _jobPollErrorCount = 0;
+function bindingLabel(ic50) {
+  if (ic50 < 50) return { text: "Very strong binding", css: "is-very-strong" };
+  if (ic50 < 150) return { text: "Strong binding", css: "is-strong" };
+  if (ic50 < 500) return { text: "Moderate binding", css: "is-moderate" };
+  return { text: "Weak binding", css: "is-weak" };
+}
+
+function vafLabel(vaf) {
+  return `Found in ${Math.round((vaf || 0) * 100)}% of tumor cells`;
+}
+
+function clonalityLabel(c) {
+  return c === "clonal" ? "Present in all tumor cells" : "Present in some tumor cells";
+}
+
+function confidenceLabel(plddt) {
+  if (plddt > 80) return "High confidence structure";
+  if (plddt > 60) return "Moderate confidence";
+  return "Low confidence";
+}
+
+function surfaceLabel(accessible) {
+  return accessible
+    ? "Reachable by the immune system"
+    : "May be harder for the immune system to reach";
+}
+
+/* ── Utility functions ───────────────────────────────────────────────── */
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-US").format(value);
@@ -306,10 +362,6 @@ function formatNumber(value) {
 
 function formatPercent(value) {
   return `${Math.round(value * 100)}%`;
-}
-
-function sentenceCase(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function escapeHtml(value) {
@@ -321,22 +373,79 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function formatTimestamp(value) {
-  if (!value) return "Unknown time";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(parsed);
+function sentenceCase(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-function setRetryAction(action) {
-  state.retryAction = action;
-  elements.retryLastActionButton.hidden = !action;
+/* ── Wizard navigation ───────────────────────────────────────────────── */
+
+function goToStep(n) {
+  if (n < 1 || n > WIZARD_STEPS.length) return;
+  if (n > state.maxUnlockedStep) return;
+
+  state.wizardStep = n;
+
+  // Toggle step visibility
+  document.querySelectorAll(".wizard-step").forEach((el) => {
+    const stepNum = Number(el.dataset.step);
+    el.classList.toggle("is-active", stepNum === n);
+  });
+
+  updateWizardProgress();
+  updateWizardNav();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+function updateWizardProgress() {
+  const steps = elements.progressSteps.querySelectorAll(".wizard-progress-step");
+  steps.forEach((el) => {
+    const stepNum = Number(el.dataset.step);
+    el.classList.remove("is-active", "is-completed", "is-locked");
+
+    if (stepNum === state.wizardStep) {
+      el.classList.add("is-active");
+    } else if (stepNum < state.wizardStep && stepNum <= state.maxUnlockedStep) {
+      el.classList.add("is-completed");
+    } else if (stepNum <= state.maxUnlockedStep) {
+      // Unlocked but not current or past — just remove locked
+    } else {
+      el.classList.add("is-locked");
+    }
+  });
+}
+
+function canAdvance() {
+  if (state.wizardStep === 1) {
+    return state.diagnosis.species !== "" && state.diagnosis.cancerType !== "";
+  }
+  if (state.wizardStep === 2) {
+    return state.loaded;
+  }
+  // Steps 3, 4, 5: always advanceable once unlocked
+  return state.wizardStep < WIZARD_STEPS.length;
+}
+
+function updateWizardNav() {
+  // Back button
+  elements.wizardBack.hidden = state.wizardStep <= 1;
+
+  // Next button
+  const isLastStep = state.wizardStep >= WIZARD_STEPS.length;
+  elements.wizardNext.hidden = isLastStep;
+  elements.wizardNext.disabled = !canAdvance();
+
+  // Contextual button text
+  const labels = {
+    1: "Continue",
+    2: state.loaded ? "See Vaccine Targets" : "Continue",
+    3: "View Blueprint",
+    4: "See Next Steps"
+  };
+  elements.wizardNext.textContent = labels[state.wizardStep] || "Continue";
+}
+
+/* ── State management ────────────────────────────────────────────────── */
 
 function resetRunState() {
   state.loaded = false;
@@ -347,8 +456,9 @@ function resetRunState() {
   state.reportUrl = "";
   state.currentRunId = "";
   state.activeJob = null;
-  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "pending"]));
+  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((s) => [s.key, "pending"]));
   state.stepExplanations = {};
+  state.stepRawMessages = {};
   elements.exportButton.disabled = true;
   // Reset visual explorer state
   state.currentScene = null;
@@ -368,314 +478,230 @@ function resetRunState() {
   if (sceneNav) sceneNav.style.display = "none";
 }
 
-function updateStatus(mode, message) {
+function updateModeChip(mode, label) {
   state.mode = mode;
-  state.statusMessage = message;
-
-  const chipClasses = {
-    idle: "",
-    running: "is-running",
-    backend: "is-backend",
-    fallback: "is-fallback"
-  };
-  const chipLabels = {
-    idle: "Awaiting run",
-    running: "Pipeline running",
-    backend: "Backend connected",
-    fallback: "Fallback fixture"
-  };
-
-  elements.modeChip.className = `mode-chip ${chipClasses[mode] || ""}`.trim();
-  elements.modeChip.textContent = chipLabels[mode] || "Awaiting run";
-  elements.pipelineStatus.textContent = message;
+  const cssMap = { idle: "", running: "is-running", backend: "is-backend", fallback: "is-fallback" };
+  elements.modeChip.className = `mode-chip ${cssMap[mode] || ""}`.trim();
+  elements.modeChip.textContent = label || mode;
 }
 
-function renderStepper() {
-  elements.stepper.innerHTML = PIPELINE_STEPS.map((step, index) => {
+/* ── Step 2: Upload UI helpers ───────────────────────────────────────── */
+
+function setUploadStatus(message, isError = false) {
+  elements.uploadStatus.textContent = message;
+  elements.uploadStatus.className = `upload-status ${isError ? "upload-status-error" : message ? "upload-status-info" : ""}`;
+}
+
+function setProgressVisible(visible) {
+  elements.jobProgressArea.hidden = !visible;
+}
+
+function updateJobProgressBar(pct, label) {
+  elements.jobProgressBar.style.width = `${pct}%`;
+  if (label) elements.jobProgressLabel.textContent = label;
+}
+
+function showPipelineProgress(visible) {
+  elements.pipelineProgress.hidden = !visible;
+}
+
+function updatePipelineBar(pct) {
+  elements.progressBar.style.width = `${pct}%`;
+}
+
+function renderMiniSteps() {
+  elements.pipelineStepsMini.innerHTML = PIPELINE_STEPS.map((step) => {
     const status = state.stepStatuses[step.key] || "pending";
-    const statusClass =
-      status === "complete" ? "is-complete" : status === "running" ? "is-active" : "";
-    const detail = state.stepExplanations[step.key] || step.detail;
+    const cls = status === "complete" ? "is-complete" : status === "running" ? "is-running" : "";
+    const hasRaw = state.stepRawMessages[step.key] && status === "complete";
+    return `<span class="mini-step ${cls}" ${hasRaw ? `data-raw-step="${step.key}"` : ""}>${step.title}${hasRaw ? ' <button class="raw-toggle-mini" data-raw-step-btn="' + step.key + '" type="button">raw</button>' : ""}</span>`;
+  }).join("") + Object.keys(state.stepRawMessages).map((key) =>
+    `<pre class="raw-data-block" id="raw-step-${key}" hidden>${escapeHtml(JSON.stringify(state.stepRawMessages[key], null, 2))}</pre>`
+  ).join("");
 
-    return `
-      <li class="stepper-item ${statusClass} reveal">
-        <span class="step-index">${index + 1}</span>
-        <h3>${step.title}</h3>
-        <p>${detail}</p>
-      </li>
-    `;
-  }).join("");
-}
-
-function renderRunHistory() {
-  elements.historyStatus.textContent = state.historyStatus;
-
-  if (state.historyLoading) {
-    elements.historyList.className = "history-list";
-    elements.historyList.innerHTML = '<div class="history-card"><p>Loading recent runs...</p></div>';
-    return;
-  }
-
-  if (!state.historyRuns.length) {
-    elements.historyList.className = "history-list empty-state";
-    elements.historyList.textContent = "No backend run history yet.";
-    return;
-  }
-
-  elements.historyList.className = "history-list";
-  elements.historyList.innerHTML = state.historyRuns
-    .map((run) => {
-      const summary = run.summary || {};
-      const isActive = run.run_id === state.currentRunId;
-      const reportUrl = `${API_ORIGIN}/api/runs/${run.run_id}/report`;
-
-      return `
-        <article class="history-card reveal ${isActive ? "is-active" : ""}" data-run-id="${escapeHtml(run.run_id)}">
-          <div>
-            <h3>${escapeHtml(summary.dataset_name || run.dataset_id || "Saved pipeline run")}</h3>
-            <p>${escapeHtml(summary.top_candidate || "Top candidate unavailable")} · ${escapeHtml(run.status)}</p>
-            <div class="history-meta">
-              <span class="history-pill">Run ${escapeHtml(run.run_id)}</span>
-              <span class="history-pill">${escapeHtml(formatTimestamp(run.created_at))}</span>
-              <span class="history-pill">${escapeHtml(`${summary.candidate_count || 0} candidates`)}</span>
-            </div>
-          </div>
-          <div class="history-actions">
-            <button class="secondary-button" data-run-report="${escapeHtml(reportUrl)}">Open Report</button>
-            <button class="primary-button" data-run-open="${escapeHtml(run.run_id)}">Reopen Run</button>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-
-  elements.historyList.querySelectorAll("[data-run-open]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const runId = button.getAttribute("data-run-open");
-      if (runId) void reopenRun(runId);
-    });
-  });
-
-  elements.historyList.querySelectorAll("[data-run-report]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const reportUrl = button.getAttribute("data-run-report");
-      if (reportUrl) {
-        window.open(reportUrl, "_blank", "noopener");
-      }
+  // Wire mini raw toggles
+  elements.pipelineStepsMini.querySelectorAll("[data-raw-step-btn]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const key = btn.dataset.rawStepBtn;
+      const block = document.getElementById(`raw-step-${key}`);
+      if (block) block.hidden = !block.hidden;
     });
   });
 }
 
-function buildSummaryMetrics(variantStats) {
-  const stats = variantStats.stats || {};
-  return [
-    { label: "Total variants", value: formatNumber(stats.total_variants || 0) },
-    { label: "Missense mutations", value: formatNumber(stats.missense_mutations || 0) },
-    { label: "Initial predictions", value: formatNumber(stats.initial_predictions || 0) },
-    { label: "Shortlisted", value: formatNumber(stats.shortlisted_candidates || state.candidates.length || 0) }
-  ];
+function startElapsedTimer(startedAt = Date.now()) {
+  if (_jobElapsedInterval) window.clearInterval(_jobElapsedInterval);
+  _jobStartTime = startedAt;
+  const tick = () => {
+    if (!_jobStartTime) return;
+    const elapsed = Math.floor((Date.now() - _jobStartTime) / 1000);
+    elements.jobElapsed.textContent = `${Math.floor(elapsed / 60)}m ${elapsed % 60}s elapsed`;
+  };
+  tick();
+  _jobElapsedInterval = window.setInterval(tick, 1000);
 }
 
-function renderSummary() {
-  if (!state.variantStats) {
-    elements.datasetTitle.textContent = "Awaiting demo load";
-    elements.datasetBanner.className = "dataset-banner muted-banner";
-    elements.datasetBanner.textContent =
-      "Load the benchmark case to render the deterministic oncology research demo.";
-    elements.summaryGrid.innerHTML = "";
-    elements.summaryNote.className = "summary-note empty-state";
-    elements.summaryNote.textContent =
-      "The mutation summary will appear here once the benchmark case is loaded.";
-    return;
-  }
+function stopPolling() {
+  if (_jobPollInterval) { window.clearInterval(_jobPollInterval); _jobPollInterval = null; }
+  if (_jobElapsedInterval) { window.clearInterval(_jobElapsedInterval); _jobElapsedInterval = null; }
+  _jobPollErrorCount = 0;
+  _jobStartTime = null;
+  elements.jobElapsed.textContent = "";
+}
 
-  const variantStats = state.variantStats;
-  const metrics = buildSummaryMetrics(variantStats);
-  const summaryText =
-    state.stepExplanations.load_dataset ||
-    "Benchmark mutation data loaded successfully.";
+/* ── Rendering: Step 3 — Candidates ──────────────────────────────────── */
 
-  elements.datasetTitle.textContent = variantStats.dataset_name;
-  elements.datasetBanner.className = "dataset-banner reveal";
-  elements.datasetBanner.innerHTML = `
-    <strong>${variantStats.tumor_type}</strong><br />
-    ${variantStats.source}
-  `;
-  elements.summaryGrid.innerHTML = metrics
-    .map(
-      (metric) => `
-        <article class="summary-card reveal">
-          <p class="summary-card-label">${metric.label}</p>
-          <p class="summary-card-value">${metric.value}</p>
-        </article>
-      `
-    )
-    .join("");
-  elements.summaryNote.className = "summary-note reveal";
-  elements.summaryNote.textContent = summaryText;
+function buildFriendlyNarrative(candidate) {
+  const binding = bindingLabel(candidate.ic50_mt);
+  const structNote = typeof candidate.surface_accessible === "boolean"
+    ? surfaceLabel(candidate.surface_accessible)
+    : "Structural accessibility is approximate in this analysis.";
+
+  return {
+    summary: `The ${candidate.gene} gene has a mutation (${candidate.mutation}) that creates an altered protein the immune system could learn to recognize. It ranks #${candidate.rank} because it combines ${binding.text.toLowerCase()} to immune receptors, active production by the tumor, and enough difference from normal proteins to be a useful target.`,
+    bullets: [
+      `${binding.text} — the immune system's receptors can grab this target ${candidate.ic50_mt < 150 ? "tightly" : "with moderate strength"}.`,
+      `${vafLabel(candidate.tumor_dna_vaf)} — ${candidate.clonality === "clonal" ? "it's present across the whole tumor, not just part of it" : "it's in some tumor cells but not all"}.`,
+      `${structNote}`
+    ],
+    caution: "This is a computational prediction, not a confirmed result. Lab validation and veterinary review are required."
+  };
 }
 
 function renderCandidates() {
   if (!state.candidates.length) {
     elements.candidateList.className = "candidate-list empty-state";
-    elements.candidateList.textContent =
-      "Candidate ranking appears after the benchmark case is loaded.";
+    elements.candidateList.textContent = "Upload your data or try the demo to see vaccine targets.";
+    elements.summaryBar.hidden = true;
     return;
   }
 
+  // Summary bar
+  if (state.variantStats) {
+    elements.summaryBar.hidden = false;
+    const stats = state.variantStats.stats || {};
+    const metrics = [
+      { label: "Total mutations", value: formatNumber(stats.total_variants || 0) },
+      { label: "Protein-changing", value: formatNumber(stats.missense_mutations || 0) },
+      { label: "Candidates screened", value: formatNumber(stats.initial_predictions || 0) },
+      { label: "Top targets", value: formatNumber(stats.shortlisted_candidates || state.candidates.length || 0) }
+    ];
+    elements.summaryGrid.innerHTML = metrics.map((m) => `
+      <article class="summary-card reveal">
+        <p class="summary-card-label">${m.label}</p>
+        <p class="summary-card-value">${m.value}</p>
+      </article>
+    `).join("");
+  }
+
+  // Candidate cards
   elements.candidateList.className = "candidate-list";
-  elements.candidateList.innerHTML = state.candidates
-    .map((candidate) => {
-      const selectedClass =
-        candidate.rank === state.selectedCandidateRank ? "is-selected" : "";
-      const clonalityLabel = sentenceCase(candidate.clonality);
+  elements.candidateList.innerHTML = state.candidates.map((c) => {
+    const selected = c.rank === state.selectedCandidateRank ? "is-selected" : "";
+    const binding = bindingLabel(c.ic50_mt);
+    const narrative = buildFriendlyNarrative(c);
 
-      return `
-        <button class="candidate-card reveal ${selectedClass}" data-rank="${candidate.rank}">
-          <div class="candidate-rank">#${candidate.rank}</div>
-          <div>
-            <div class="candidate-header">
-              <h3>${candidate.gene} ${candidate.mutation}</h3>
-              <span class="candidate-tag">${candidate.hla_allele}</span>
+    return `
+      <div class="candidate-card reveal ${selected}" data-rank="${c.rank}">
+        <div class="candidate-rank">#${c.rank}</div>
+        <div>
+          <div class="candidate-header">
+            <h3>${escapeHtml(c.gene)} ${escapeHtml(c.mutation)}</h3>
+          </div>
+          <p class="candidate-meta">${clonalityLabel(c.clonality)} &middot; ${vafLabel(c.tumor_dna_vaf)}</p>
+          <div class="candidate-badges">
+            <span class="binding-badge ${binding.css}">${binding.text}</span>
+            ${c.surface_accessible ? '<span class="binding-badge is-strong">Surface accessible</span>' : ""}
+          </div>
+          ${selected ? `
+            <div class="candidate-detail">
+              <p>${narrative.summary}</p>
+              <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
+              <div class="guardrail">${narrative.caution}</div>
+              <button class="tech-toggle" data-tech-rank="${c.rank}" type="button">Show technical values</button>
+              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
             </div>
-            <p class="candidate-meta">
-              Peptide ${candidate.mt_epitope_seq} · Binding ${candidate.ic50_mt} nM · Expression ${candidate.gene_expression_tpm} TPM · Clonality ${clonalityLabel}
-            </p>
-          </div>
-          <div class="candidate-score">
-            <span>Priority</span>
-            <strong>${candidate.priority_score}</strong>
-          </div>
-        </button>
-      `;
-    })
-    .join("");
+          ` : ""}
+        </div>
+        <div class="candidate-score">
+          <span>Score</span>
+          <strong>${c.priority_score}</strong>
+        </div>
+      </div>
+    `;
+  }).join("");
 
-  elements.candidateList.querySelectorAll("[data-rank]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedCandidateRank = Number(button.getAttribute("data-rank"));
+  // Wire click handlers
+  elements.candidateList.querySelectorAll("[data-rank]").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".tech-toggle")) return;
+      state.selectedCandidateRank = Number(card.dataset.rank);
       renderCandidates();
-      renderExplanation();
     });
   });
+
+  // Wire tech toggles
+  elements.candidateList.querySelectorAll(".tech-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rank = btn.dataset.techRank;
+      const el = document.getElementById(`tech-${rank}`);
+      if (el) el.classList.toggle("is-visible");
+    });
+  });
+
+  // Raw data for Step 3
+  elements.rawCandidatesArea.hidden = false;
+  elements.rawCandidatesBlock.textContent = JSON.stringify(state.candidates, null, 2);
 }
 
-function buildCandidateNarrative(candidate) {
-  const structureNote =
-    typeof candidate.surface_accessible === "boolean"
-      ? candidate.surface_accessible
-        ? "The mutated region is predicted to stay surface-accessible, which strengthens the research case."
-        : "The mutated region may be less surface-accessible, which is one reason it ranks below the strongest leads."
-      : "Structural context is approximate in this demo and should be treated as a supporting signal only.";
-
-  return {
-    summary:
-      `${candidate.gene} ${candidate.mutation} ranks #${candidate.rank} because it balances strong predicted binding, measurable tumor expression, and enough mutant-specific separation from the wildtype peptide to make the shortlist explainable.`,
-    bullets: [
-      `Predicted binding is ${candidate.ic50_mt} nM for ${candidate.hla_allele}, which keeps the peptide inside the benchmark shortlist threshold.`,
-      `Tumor expression is ${candidate.gene_expression_tpm} TPM and DNA VAF is ${formatPercent(candidate.tumor_dna_vaf || 0)}, so the mutation is both present and measurable in the sample.`,
-      `Mutant-vs-wildtype fold change is ${candidate.fold_change}x. ${structureNote}`
-    ],
-    caution:
-      "This is a research prioritization signal, not evidence of therapeutic efficacy. Experimental validation and expert review are still required."
-  };
-}
-
-function buildCandidateComparison(candidate, nextCandidate) {
-  if (!candidate || !nextCandidate) return "";
-
-  const bindingDelta = Math.round((nextCandidate.ic50_mt || 0) - (candidate.ic50_mt || 0));
-  const expressionDelta = ((candidate.gene_expression_tpm || 0) - (nextCandidate.gene_expression_tpm || 0)).toFixed(1);
-  const vafDelta = Math.round(((candidate.tumor_dna_vaf || 0) - (nextCandidate.tumor_dna_vaf || 0)) * 100);
-
-  return `${candidate.gene} ${candidate.mutation} stays ahead of ${nextCandidate.gene} ${nextCandidate.mutation} because it combines ${
-    bindingDelta > 0 ? `${bindingDelta} nM stronger predicted binding` : "comparable predicted binding"
-  }, ${expressionDelta > 0 ? `${expressionDelta} TPM higher expression` : "similar expression"}, and ${
-    vafDelta > 0 ? `${vafDelta}% higher DNA VAF` : "similar clonality"
-  }.`;
-}
-
-function renderExplanation() {
-  if (!state.candidates.length) {
-    elements.explanationCard.className = "explanation-card empty-state";
-    elements.explanationCard.textContent =
-      "Select a ranked candidate to inspect the explanation panel.";
-    return;
-  }
-
-  const candidate =
-    state.candidates.find((item) => item.rank === state.selectedCandidateRank) ||
-    state.candidates[0];
-  const narrative = buildCandidateNarrative(candidate);
-  const rankingNote = state.stepExplanations.ranking;
-  const nextCandidate = state.candidates.find((item) => item.rank === candidate.rank + 1);
-  const comparison = buildCandidateComparison(candidate, nextCandidate);
-
-  state.selectedCandidateRank = candidate.rank;
-  elements.explanationCard.className = "explanation-card reveal";
-  elements.explanationCard.innerHTML = `
-    <h3>${candidate.gene} ${candidate.mutation} ranks #${candidate.rank}</h3>
-    <p class="explanation-copy">${narrative.summary}</p>
-    ${rankingNote ? `<p class="explanation-copy">${rankingNote}</p>` : ""}
-    ${comparison ? `<p class="explanation-copy"><strong>Why it outranks the next candidate:</strong> ${comparison}</p>` : ""}
-    <ul>
-      ${narrative.bullets.map((reason) => `<li>${reason}</li>`).join("")}
-    </ul>
-    <p class="explanation-copy"><strong>Guardrail:</strong> ${narrative.caution}</p>
-  `;
-}
+/* ── Rendering: Step 4 — Blueprint ───────────────────────────────────── */
 
 function renderBlueprint() {
   if (!state.blueprint) {
     elements.blueprintCard.className = "blueprint-card empty-state";
-    elements.blueprintCard.textContent =
-      "The construct preview is shown after the benchmark case is loaded.";
+    elements.blueprintCard.textContent = "The vaccine blueprint will appear after analysis is complete.";
+    elements.blueprintActions.hidden = true;
+    elements.technicalDetails.hidden = true;
     return;
   }
 
+  const bp = state.blueprint;
   elements.blueprintCard.className = "blueprint-card reveal";
   elements.blueprintCard.innerHTML = `
-    <h3>${state.blueprint.construct_id}</h3>
-    <p class="blueprint-copy">${state.blueprint.payload_summary}</p>
+    <div class="blueprint-summary">
+      <div class="blueprint-section">
+        <h4>What to synthesize</h4>
+        <p>A multi-target vaccine construct containing <strong>${bp.antigen_count || state.candidates.length} vaccine targets</strong> from the highest-ranked mutations found in the tumor.</p>
+        <p>Each target is a short protein fragment that the immune system can learn to recognize and attack.</p>
+      </div>
+      <div class="blueprint-section">
+        <h4>Why these targets</h4>
+        <p>These targets were selected because they combine strong immune binding, active production by the tumor, and enough difference from normal proteins to minimize the risk of the immune system attacking healthy tissue.</p>
+      </div>
+      <div class="blueprint-section">
+        <h4>What to expect</h4>
+        <p>This blueprint is a starting point for discussion with your veterinarian and a synthesis lab. It is <strong>not</strong> a ready-to-manufacture design — it requires professional review, wet-lab validation, and formulation.</p>
+      </div>
+    </div>
     <dl class="blueprint-metadata">
-      <div>
-        <dt>Strategy</dt>
-        <dd>${state.blueprint.strategy}</dd>
-      </div>
-      <div>
-        <dt>Format</dt>
-        <dd>${state.blueprint.format}</dd>
-      </div>
-      <div>
-        <dt>Length</dt>
-        <dd>${state.blueprint.total_length_nt} nt</dd>
-      </div>
-      <div>
-        <dt>Antigens</dt>
-        <dd>${state.blueprint.antigen_count || state.candidates.length}</dd>
-      </div>
+      <div><dt>Construct ID</dt><dd>${escapeHtml(bp.construct_id)}</dd></div>
+      <div><dt>Strategy</dt><dd>${escapeHtml(bp.strategy)}</dd></div>
+      <div><dt>Targets included</dt><dd>${bp.antigen_count || state.candidates.length}</dd></div>
+      <div><dt>Total length</dt><dd>${bp.total_length_nt} nucleotides</dd></div>
     </dl>
-    <ul>
-      ${state.blueprint.notes.map((note) => `<li>${note}</li>`).join("")}
+    <ul style="margin-top:14px;padding-left:18px;color:var(--muted);line-height:1.7;">
+      ${bp.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
     </ul>
-    <pre class="sequence-block">${state.blueprint.sequence_preview}</pre>
   `;
-}
 
-function renderLimitations() {
-  const limitations =
-    state.mode === "backend"
-      ? [
-          "Benchmark HCC1395 dataset only.",
-          "Pipeline is fixture-first even when the backend is connected.",
-          "No clinical recommendation or treatment guidance is implied.",
-          "Human expert review remains required before downstream use."
-        ]
-      : FALLBACK_RUN.limitations;
+  elements.blueprintActions.hidden = false;
+  elements.exportButton.disabled = !(state.reportUrl || state.mode === "fallback");
+  elements.sequenceBlock.textContent = bp.sequence_preview;
 
-  elements.limitationsList.innerHTML = limitations
-    .map((item) => `<li>${item}</li>`)
-    .join("");
+  // Raw data for Step 4
+  elements.rawBlueprintArea.hidden = false;
+  elements.rawBlueprintBlock.textContent = JSON.stringify(bp, null, 2);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1582,20 +1608,7 @@ function enterVisualExplorer() {
   activateScene("3a");
 }
 
-function renderAll() {
-  renderStepper();
-  renderRunHistory();
-  renderSummary();
-  renderCandidates();
-  renderExplanation();
-  renderBlueprint();
-  renderLimitations();
-
-  // Re-initialize Lucide icons after dynamic rendering
-  if (typeof lucide !== "undefined") {
-    lucide.createIcons();
-  }
-}
+/* ── Pipeline message handling ───────────────────────────────────────── */
 
 function applyPipelineMessage(message) {
   if (message.step && state.stepStatuses[message.step] !== undefined) {
@@ -1603,6 +1616,9 @@ function applyPipelineMessage(message) {
   }
   if (message.explanation) {
     state.stepExplanations[message.step] = message.explanation;
+  }
+  if (message.step && message.step !== "pipeline_complete") {
+    state.stepRawMessages[message.step] = message;
   }
 
   if (message.step === "load_dataset" && message.status === "complete") {
@@ -1624,18 +1640,24 @@ function applyPipelineMessage(message) {
     state.currentRunId = message.run_id || message.data?.run_id || "";
     state.activeJob = null;
     elements.exportButton.disabled = !state.reportUrl;
-    elements.loadButton.disabled = false;
-    elements.loadButton.textContent = "Reload Benchmark Case";
     clearPendingFullAnalysis();
-    setRetryAction("");
-    updateStatus(
-      "backend",
-      "Local backend run completed successfully. The export button now downloads the generated PDF research brief."
-    );
-    void fetchRunHistory();
+    updateModeChip("backend", "Connected");
+    showPipelineProgress(false);
+
+    // Unlock all wizard steps and auto-advance to step 3
+    state.maxUnlockedStep = 5;
+    renderCandidates();
+    renderBlueprint();
+    updateVetLetter();
+    goToStep(3);
   }
 
-  renderAll();
+  // Update mini pipeline progress
+  renderMiniSteps();
+  const completedCount = Object.values(state.stepStatuses).filter((s) => s === "complete").length;
+  updatePipelineBar(Math.round((completedCount / PIPELINE_STEPS.length) * 100));
+  elements.pipelineStatus.textContent =
+    state.stepExplanations[message.step] || PIPELINE_STEPS.find((s) => s.key === message.step)?.detail || "Processing...";
 
   // Enter visual explorer when data is ready
   if (message.step === "pipeline_complete" && message.status === "complete") {
@@ -1653,253 +1675,96 @@ function applyFallbackRun() {
   state.blueprint = FALLBACK_RUN.blueprint;
   state.selectedCandidateRank = FALLBACK_RUN.candidates[0].rank;
   state.stepExplanations = { ...FALLBACK_RUN.explanations };
-  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "complete"]));
+  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((s) => [s.key, "complete"]));
   elements.exportButton.disabled = false;
-  elements.loadButton.disabled = false;
-  elements.loadButton.textContent = "Reload Benchmark Case";
-  updateStatus(
-    "fallback",
-    "Backend connection was unavailable, so the app loaded the embedded benchmark fixture instead. The demo path remains stable."
-  );
-  renderAll();
+  updateModeChip("fallback", "Demo mode");
+  showPipelineProgress(false);
+
+  state.maxUnlockedStep = 5;
+  renderCandidates();
+  renderBlueprint();
+  updateVetLetter();
+  goToStep(3);
   enterVisualExplorer();
 }
 
-function applySavedRun(run) {
-  const payload = run.payload || {};
+/* ── Vet letter template ─────────────────────────────────────────────── */
 
-  resetRunState();
-  state.loaded = true;
-  state.loading = false;
-  state.variantStats = payload.variant_stats || null;
-  state.candidates = payload.candidates || [];
-  state.blueprint = payload.blueprint || null;
-  state.selectedCandidateRank = state.candidates[0]?.rank || null;
-  state.currentRunId = run.run_id;
-  state.reportUrl = payload.report_path ? `${API_ORIGIN}/api/runs/${run.run_id}/report` : "";
-  state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((step) => [step.key, "complete"]));
-  state.stepExplanations = {
-    load_dataset: "Loaded from saved backend run history.",
-    ranking: "Candidate ranking was restored from a completed backend run.",
-    report: "The PDF report for this saved run is ready to open."
-  };
-  elements.exportButton.disabled = !state.reportUrl;
-  elements.loadButton.disabled = false;
-  elements.loadButton.textContent = "Reload Benchmark Case";
-  updateStatus(
-    "backend",
-    `Loaded saved run ${run.run_id}. The dataset summary, ranked candidates, and PDF report were restored from backend history.`
-  );
-  renderAll();
-  enterVisualExplorer();
+function updateVetLetter() {
+  const species = state.diagnosis.species || "[species]";
+  const cancerType = state.diagnosis.cancerType
+    ? (SEQUENCING_GUIDANCE[state.diagnosis.cancerType]?.name || state.diagnosis.cancerTypeCustom || state.diagnosis.cancerType)
+    : "[cancer type]";
+  const topCandidate = state.candidates[0];
+  const candidateCount = state.candidates.length;
+
+  elements.vetLetterText.textContent = `Dear Dr. [Vet Name],
+
+I've been exploring personalized cancer vaccine options for [Pet Name],
+my ${species} diagnosed with ${cancerType}.
+
+Using tumor sequencing data, I've identified ${candidateCount} potential
+vaccine targets through computational analysis. I've attached a summary
+report from VaxAgent.
+
+Key points:
+- The top target is a ${topCandidate ? topCandidate.gene + " " + topCandidate.mutation : "[gene]"} mutation with ${topCandidate ? bindingLabel(topCandidate.ic50_mt).text.toLowerCase() : "predicted"} immune binding
+- ${candidateCount} targets were identified with predicted immune recognition
+- This analysis is computational only and requires clinical interpretation
+
+I understand this is an emerging approach and would value your expert
+guidance on next steps.
+
+Thank you,
+[Owner Name]`;
 }
 
-function persistPendingFullAnalysis(jobId, fileName, startedAt = Date.now()) {
-  try {
-    localStorage.setItem(
-      PENDING_FULL_ANALYSIS_KEY,
-      JSON.stringify({ jobId, fileName, startedAt })
-    );
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
-function readPendingFullAnalysis() {
-  try {
-    const raw = localStorage.getItem(PENDING_FULL_ANALYSIS_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearPendingFullAnalysis() {
-  try {
-    localStorage.removeItem(PENDING_FULL_ANALYSIS_KEY);
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
-async function fetchRunHistory() {
-  state.historyLoading = true;
-  state.historyStatus = "Loading recent runs from the backend...";
-  renderRunHistory();
-
-  try {
-    const response = await fetch(`${API_ORIGIN}/api/runs`);
-    if (!response.ok) {
-      throw new Error(`History request failed (HTTP ${response.status})`);
-    }
-
-    const result = await response.json();
-    state.historyRuns = result.runs || [];
-    state.historyStatus = state.historyRuns.length
-      ? "Recent backend runs can be reopened or exported directly from here."
-      : "The backend is available, but no runs have been saved yet.";
-  } catch {
-    state.historyRuns = [];
-    state.historyStatus = "Run history is unavailable until the backend responds.";
-  } finally {
-    state.historyLoading = false;
-    renderRunHistory();
-  }
-}
-
-async function reopenRun(runId) {
-  state.historyStatus = `Loading saved run ${runId}...`;
-  renderRunHistory();
-
-  try {
-    const response = await fetch(`${API_ORIGIN}/api/runs/${runId}`);
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `Run reload failed (HTTP ${response.status})`);
-    }
-
-    const run = await response.json();
-    applySavedRun(run);
-    state.historyStatus = `Saved run ${runId} is active in the workspace.`;
-    renderRunHistory();
-  } catch (err) {
-    state.historyStatus = `Could not reopen run ${runId}: ${err.message}`;
-    renderRunHistory();
-  }
-}
-
-function buildFallbackReport() {
-  const top = state.candidates[0];
-  const summaryMetrics = buildSummaryMetrics(state.variantStats);
-
-  return `# VaxAgent Research Brief
-
-## Dataset
-
-- Case: ${state.variantStats.dataset_name}
-- Tumor type: ${state.variantStats.tumor_type}
-- Source: ${state.variantStats.source}
-
-## Mutation Summary
-
-${summaryMetrics.map((metric) => `- ${metric.label}: ${metric.value}`).join("\n")}
-
-## Ranked Candidates
-
-${state.candidates
-  .map(
-    (candidate) =>
-      `### #${candidate.rank} ${candidate.gene} ${candidate.mutation}\n- Peptide: ${candidate.mt_epitope_seq}\n- HLA: ${candidate.hla_allele}\n- IC50: ${candidate.ic50_mt} nM\n- Expression: ${candidate.gene_expression_tpm} TPM\n- DNA VAF: ${formatPercent(candidate.tumor_dna_vaf || 0)}\n- Priority score: ${candidate.priority_score}`
-  )
-  .join("\n\n")}
-
-## Highlighted Explanation
-
-${buildCandidateNarrative(top).summary}
-
-## Draft mRNA Blueprint
-
-- Construct ID: ${state.blueprint.construct_id}
-- Strategy: ${state.blueprint.strategy}
-- Payload: ${state.blueprint.payload_summary}
-
-## Limitations
-
-${FALLBACK_RUN.limitations.map((item) => `- ${item}`).join("\n")}
-`;
-}
-
-function exportBrief() {
-  if (state.mode === "backend" && state.reportUrl) {
-    window.open(state.reportUrl, "_blank", "noopener");
-    return;
-  }
-
-  const blob = new Blob([buildFallbackReport()], {
-    type: "text/markdown;charset=utf-8"
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "vaxagent-research-brief.md";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
+/* ── WebSocket pipeline ──────────────────────────────────────────────── */
 
 function runBackendPipelineWithUrl(wsUrl, timeoutMs = PIPELINE_CONNECT_TIMEOUT_MS) {
   return new Promise((resolve) => {
     let settled = false;
     let sawAnyMessage = false;
     const timeout = window.setTimeout(() => {
-      if (settled) {
-        return;
-      }
+      if (settled) return;
       settled = true;
-      if (state.ws) {
-        state.ws.close();
-        state.ws = null;
-      }
+      if (state.ws) { state.ws.close(); state.ws = null; }
       resolve(false);
     }, timeoutMs);
 
     try {
       state.ws = new WebSocket(wsUrl);
-    } catch (_error) {
+    } catch {
       window.clearTimeout(timeout);
       resolve(false);
       return;
     }
 
     state.ws.onopen = () => {
-      updateStatus(
-        "running",
-        `Connected to the local backend at ${API_ORIGIN}. Streaming the benchmark pipeline now.`
-      );
+      updateModeChip("running", "Analyzing...");
+      showPipelineProgress(true);
+      elements.pipelineStatus.textContent = "Connected. Running analysis pipeline...";
     };
 
     state.ws.onmessage = (event) => {
       sawAnyMessage = true;
       let message;
-      try {
-        message = JSON.parse(event.data);
-        applyPipelineMessage(message);
-      } catch (_parseErr) {
-        return;
-      }
-
+      try { message = JSON.parse(event.data); applyPipelineMessage(message); } catch { return; }
       if (message.status === "error") {
         window.clearTimeout(timeout);
-        if (!settled) {
-          settled = true;
-          resolve(false);
-        }
+        if (!settled) { settled = true; resolve(false); }
       }
-
       if (message.step === "pipeline_complete" && message.status === "complete") {
         window.clearTimeout(timeout);
-        if (state.ws) {
-          state.ws.close();
-          state.ws = null;
-        }
-        if (!settled) {
-          settled = true;
-          resolve(true);
-        }
+        if (state.ws) { state.ws.close(); state.ws = null; }
+        if (!settled) { settled = true; resolve(true); }
       }
     };
 
     state.ws.onerror = () => {
       window.clearTimeout(timeout);
-      if (state.ws) {
-        state.ws.close();
-        state.ws = null;
-      }
-      if (!settled) {
-        settled = true;
-        resolve(false);
-      }
+      if (state.ws) { state.ws.close(); state.ws = null; }
+      if (!settled) { settled = true; resolve(false); }
     };
 
     state.ws.onclose = () => {
@@ -1912,502 +1777,421 @@ function runBackendPipelineWithUrl(wsUrl, timeoutMs = PIPELINE_CONNECT_TIMEOUT_M
   });
 }
 
+/* ── Upload & analysis flows ─────────────────────────────────────────── */
+
+function persistPendingFullAnalysis(jobId, fileName, startedAt = Date.now()) {
+  try { localStorage.setItem(PENDING_FULL_ANALYSIS_KEY, JSON.stringify({ jobId, fileName, startedAt })); } catch {}
+}
+function readPendingFullAnalysis() {
+  try { const raw = localStorage.getItem(PENDING_FULL_ANALYSIS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function clearPendingFullAnalysis() {
+  try { localStorage.removeItem(PENDING_FULL_ANALYSIS_KEY); } catch {}
+}
+
 async function checkDockerAvailability() {
   try {
     const res = await fetch(`${API_ORIGIN}/health`);
     if (!res.ok) return false;
     const data = await res.json();
     return data.docker === true;
-  } catch {
-    return false;
-  }
-}
-
-function setAnalysisMode(mode) {
-  _analysisMode = mode;
-  elements.modeQuickBtn.classList.toggle("is-selected", mode === "quick");
-  elements.modeFullBtn.classList.toggle("is-selected", mode === "full");
-  elements.modeDescription.innerHTML = MODE_DESCRIPTIONS[mode];
-  elements.hlaAllelesInput.required = mode === "full";
-  const placeholder =
-    mode === "full"
-      ? "HLA alleles (required) — e.g. HLA-A*02:01, HLA-B*07:02"
-      : "HLA alleles (optional) — e.g. HLA-A*02:01, HLA-B*07:02";
-  elements.hlaAllelesInput.placeholder = placeholder;
-  setUploadStatus("");
-}
-
-function setProgressVisible(visible) {
-  elements.jobProgressArea.hidden = !visible;
-}
-
-function updateProgressBar(pct, label) {
-  elements.progressBar.style.width = `${pct}%`;
-  if (label) elements.jobProgressLabel.textContent = label;
-}
-
-function startElapsedTimer(startedAt = Date.now()) {
-  if (_jobElapsedInterval) {
-    window.clearInterval(_jobElapsedInterval);
-  }
-
-  _jobStartTime = startedAt;
-  const tick = () => {
-    if (!_jobStartTime) return;
-    const elapsed = Math.floor((Date.now() - _jobStartTime) / 1000);
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    elements.jobElapsed.textContent = `${mins}m ${secs}s elapsed`;
-  };
-  tick();
-  _jobElapsedInterval = window.setInterval(tick, 1000);
-}
-
-function stopPolling() {
-  if (_jobPollInterval) {
-    window.clearInterval(_jobPollInterval);
-    _jobPollInterval = null;
-  }
-  if (_jobElapsedInterval) {
-    window.clearInterval(_jobElapsedInterval);
-    _jobElapsedInterval = null;
-  }
-  _jobPollErrorCount = 0;
-  _jobStartTime = null;
-  elements.jobElapsed.textContent = "";
-}
-
-function restorePrimaryActions() {
-  state.loading = false;
-  elements.analyseButton.disabled = !elements.vcfFileInput.files[0];
-  elements.analyseButton.textContent = "Analyse My File";
-  elements.loadButton.disabled = false;
-}
-
-function describeRetryAction(action) {
-  if (action === "demo") return "Retry Benchmark Load";
-  if (action === "quick-analysis") return "Retry Quick Analysis";
-  if (action === "full-analysis") return "Retry Full Analysis";
-  if (action === "resume-full-analysis") return "Retry Result Reopen";
-  return "Retry Last Action";
-}
-
-function scheduleRetryAction(action) {
-  setRetryAction(action);
-  if (action) {
-    elements.retryLastActionButton.textContent = describeRetryAction(action);
-  }
+  } catch { return false; }
 }
 
 async function startCompletedJobPipeline(jobId, fileName) {
-  updateProgressBar(100, "pVACseq complete. Loading results...");
-  setUploadStatus(`pVACseq complete for ${fileName}. Running analysis pipeline...`);
-
+  updateJobProgressBar(100, "Analysis complete. Loading results...");
+  setUploadStatus(`Analysis complete for ${fileName}. Loading results...`);
   const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?job_id=${jobId}`;
   const ok = await runBackendPipelineWithUrl(wsUrl, 60000);
   setProgressVisible(false);
-
   if (!ok) {
-    setUploadStatus(
-      "The backend could not reopen this completed pVACseq job into the workspace. Retry to request the finished results again.",
-      true
-    );
-    scheduleRetryAction("resume-full-analysis");
-    updateStatus(
-      "idle",
-      "The long-running backend job finished, but the final UI hydration step failed. Retry to reopen the completed result."
-    );
+    setUploadStatus("Could not load the completed results. Please try again.", true);
+    updateModeChip("idle", "Awaiting");
   } else {
-    setRetryAction("");
-    setUploadStatus(`Full pVACseq analysis complete for ${fileName}.`);
+    setUploadStatus(`Analysis complete for ${fileName}.`);
   }
 }
 
 async function pollFullAnalysisJob(jobId, fileName) {
   try {
     const res = await fetch(`${API_ORIGIN}/api/jobs/${jobId}`);
-    if (!res.ok) {
-      return;
-    }
-
+    if (!res.ok) return;
     _jobPollErrorCount = 0;
     const job = await res.json();
-    state.activeJob = {
-      jobId,
-      fileName,
-      status: job.status,
-      error: job.error_msg || ""
-    };
-
-    updateProgressBar(job.progress_pct || 5, `pVACseq ${job.status}...`);
+    state.activeJob = { jobId, fileName, status: job.status, error: job.error_msg || "" };
+    updateJobProgressBar(job.progress_pct || 5, `Analyzing... ${job.status}`);
     setUploadStatus(
       job.status === "running"
-        ? `pVACseq is running for ${fileName}. Job ${jobId} remains resumable if you refresh this page.`
-        : `Job ${jobId} is ${job.status}.`,
-      false
+        ? `Running analysis for ${fileName}. You can leave this page open.`
+        : `Job ${jobId} is ${job.status}.`
     );
-
     if (job.status === "complete") {
       stopPolling();
       await startCompletedJobPipeline(jobId, fileName);
-      restorePrimaryActions();
+      state.loading = false;
+      elements.analyseButton.disabled = !elements.vcfFileInput.files[0];
+      elements.analyseButton.textContent = "Analyse My File";
       return;
     }
-
     if (job.status === "failed") {
       stopPolling();
       clearPendingFullAnalysis();
       setProgressVisible(false);
-      setUploadStatus(`pVACseq failed: ${job.error_msg || "unknown error"}`, true);
-      scheduleRetryAction("full-analysis");
+      setUploadStatus(`Analysis failed: ${job.error_msg || "unknown error"}`, true);
       state.activeJob = null;
-      restorePrimaryActions();
-      updateStatus(
-        "idle",
-        "The backend job failed before candidate ranking could be loaded. Review the error above and retry when ready."
-      );
+      state.loading = false;
+      elements.analyseButton.disabled = !elements.vcfFileInput.files[0];
+      elements.analyseButton.textContent = "Analyse My File";
+      updateModeChip("idle", "Awaiting");
     }
   } catch {
     _jobPollErrorCount += 1;
     if (_jobPollErrorCount >= 3) {
-      setUploadStatus(
-        `Status polling lost contact with job ${jobId}. VaxAgent will keep retrying, and refreshing this page will resume the same job.`,
-        true
-      );
+      setUploadStatus(`Connection interrupted. VaxAgent will keep retrying automatically.`, true);
     }
   }
 }
 
 function beginFullAnalysisPolling(jobId, fileName, options = {}) {
   stopPolling();
-
   const startedAt = options.startedAt || Date.now();
   persistPendingFullAnalysis(jobId, fileName, startedAt);
-  state.activeJob = {
-    jobId,
-    fileName,
-    status: "queued",
-    error: ""
-  };
-
+  state.activeJob = { jobId, fileName, status: "queued", error: "" };
   setProgressVisible(true);
-  updateProgressBar(options.initialProgress || 5, options.initialLabel || "pVACseq queued...");
-  elements.jobProgressNote.textContent =
-    "This full-analysis job is resumable. If the page refreshes, VaxAgent will reconnect to the same backend job automatically.";
+  updateJobProgressBar(options.initialProgress || 5, options.initialLabel || "Queued...");
+  elements.jobProgressNote.textContent = "This analysis will continue even if you refresh the page.";
   startElapsedTimer(startedAt);
-
   void pollFullAnalysisJob(jobId, fileName);
-  _jobPollInterval = window.setInterval(() => {
-    void pollFullAnalysisJob(jobId, fileName);
-  }, JOB_POLL_INTERVAL_MS);
+  _jobPollInterval = window.setInterval(() => void pollFullAnalysisJob(jobId, fileName), JOB_POLL_INTERVAL_MS);
 }
 
 async function submitFullPipeline() {
   const file = elements.vcfFileInput.files[0];
   if (!file) return;
-
   const hla = elements.hlaAllelesInput.value.trim();
-  if (!hla) {
-    setUploadStatus("HLA alleles are required for full pVACseq analysis.", true);
-    return;
-  }
-
+  if (!hla) { setUploadStatus("Immune receptor alleles are required for full analysis.", true); return; }
   if (state.loading) return;
 
   resetRunState();
   state.loading = true;
   elements.analyseButton.disabled = true;
-  elements.loadButton.disabled = true;
   elements.analyseButton.textContent = "Submitting...";
-  setRetryAction("");
-  setUploadStatus("Uploading VCF and submitting pVACseq job...");
+  setUploadStatus("Uploading and starting analysis...");
   setProgressVisible(true);
-  updateProgressBar(2, "Uploading file...");
-  updateStatus("running", "Submitting pVACseq job. This will take 30–60 minutes.");
-  renderAll();
+  updateJobProgressBar(2, "Uploading...");
+  updateModeChip("running", "Analyzing...");
 
   const formData = new FormData();
   formData.append("vcf_file", file);
   formData.append("hla_alleles", hla);
 
-  let jobId = null;
+  let jobId;
   try {
-    const res = await fetch(`${API_ORIGIN}/api/jobs/pvacseq`, {
-      method: "POST",
-      body: formData
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `Submission failed (HTTP ${res.status})`);
-    }
+    const res = await fetch(`${API_ORIGIN}/api/jobs/pvacseq`, { method: "POST", body: formData });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `Submission failed`); }
     const result = await res.json();
     jobId = result.job_id;
   } catch (err) {
-    setUploadStatus(`Submission error: ${err.message}`, true);
+    setUploadStatus(`Error: ${err.message}`, true);
     setProgressVisible(false);
-    scheduleRetryAction("full-analysis");
-    restorePrimaryActions();
-    updateStatus("idle", state.statusMessage);
+    state.loading = false;
+    elements.analyseButton.disabled = !file;
+    elements.analyseButton.textContent = "Analyse My File";
+    updateModeChip("idle", "Awaiting");
     return;
   }
 
-  elements.analyseButton.textContent = "pVACseq running...";
-  setUploadStatus(`Job submitted (ID: ${jobId}). Polling for completion...`);
+  elements.analyseButton.textContent = "Analyzing...";
+  setUploadStatus(`Analysis started. This may take 30–60 minutes.`);
   beginFullAnalysisPolling(jobId, file.name);
 }
 
-function setUploadStatus(message, isError = false) {
-  elements.uploadStatus.textContent = message;
-  elements.uploadStatus.className = `upload-status ${isError ? "upload-status-error" : message ? "upload-status-info" : ""}`;
-}
-
-async function retryLastAction() {
-  if (state.loading || !state.retryAction) return;
-
-  if (state.retryAction === "demo") {
-    return loadDemo();
-  }
-
-  if (state.retryAction === "resume-full-analysis") {
-    const pending = readPendingFullAnalysis();
-    if (pending) {
-      resetRunState();
-      state.loading = true;
-      elements.analyseButton.disabled = true;
-      elements.loadButton.disabled = true;
-      elements.analyseButton.textContent = "Resuming...";
-      updateStatus("running", `Reopening completed backend job ${pending.jobId} into the workspace.`);
-      renderAll();
-      beginFullAnalysisPolling(pending.jobId, pending.fileName, {
-        startedAt: pending.startedAt,
-        initialLabel: "Reconnecting to backend job..."
-      });
-      return;
-    }
-  }
-
-  if (state.retryAction === "quick-analysis") {
-    return uploadAndRun();
-  }
-
-  if (state.retryAction === "full-analysis") {
-    return submitFullPipeline();
-  }
-}
-
-async function restorePendingFullAnalysis() {
-  const pending = readPendingFullAnalysis();
-  if (!pending || state.loading) return;
-
-  resetRunState();
-  state.loading = true;
-  elements.analyseButton.disabled = true;
-  elements.loadButton.disabled = true;
-  elements.analyseButton.textContent = "Resuming...";
-  setRetryAction("");
-  setUploadStatus(
-    `Recovered active pVACseq job ${pending.jobId} for ${pending.fileName}. Reconnecting to backend progress...`
-  );
-  updateStatus(
-    "running",
-    `Recovered backend job ${pending.jobId} after refresh. VaxAgent is reconnecting to the long-running analysis.`
-  );
-  renderAll();
-
-  beginFullAnalysisPolling(pending.jobId, pending.fileName, {
-    startedAt: pending.startedAt,
-    initialLabel: "Reconnecting to backend job..."
-  });
-}
-
 async function uploadAndRun() {
-  if (_analysisMode === "full") {
-    return submitFullPipeline();
-  }
-
+  if (_analysisMode === "full") return submitFullPipeline();
   const file = elements.vcfFileInput.files[0];
-  if (!file) {
-    return;
-  }
-
-  if (state.loading) {
-    return;
-  }
+  if (!file || state.loading) return;
 
   resetRunState();
   state.loading = true;
   elements.analyseButton.disabled = true;
-  elements.loadButton.disabled = true;
   elements.analyseButton.textContent = "Uploading...";
-  setRetryAction("");
-  setUploadStatus("Uploading and parsing your VCF file...");
-  updateStatus(
-    "running",
-    "Uploading your VCF file and parsing variant statistics."
-  );
-  renderAll();
+  setUploadStatus("Uploading and parsing your file...");
+  updateModeChip("running", "Analyzing...");
 
   const formData = new FormData();
   formData.append("vcf_file", file);
   const hla = elements.hlaAllelesInput.value.trim();
-  if (hla) {
-    formData.append("hla_alleles", hla);
-  }
+  if (hla) formData.append("hla_alleles", hla);
 
-  let fileId = null;
+  let fileId;
   try {
-    const response = await fetch(`${API_ORIGIN}/api/upload`, {
-      method: "POST",
-      body: formData
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `Upload failed (HTTP ${response.status})`);
-    }
+    const response = await fetch(`${API_ORIGIN}/api/upload`, { method: "POST", body: formData });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || `Upload failed`); }
     const result = await response.json();
     fileId = result.file_id;
-    setUploadStatus(`Parsed ${file.name}. Running analysis pipeline...`);
-    elements.analyseButton.textContent = "Pipeline running...";
+    setUploadStatus(`Parsed ${file.name}. Running analysis...`);
+    elements.analyseButton.textContent = "Analyzing...";
   } catch (err) {
     setUploadStatus(`Upload error: ${err.message}`, true);
-    scheduleRetryAction("quick-analysis");
-    restorePrimaryActions();
-    updateStatus("idle", state.statusMessage);
+    state.loading = false;
+    elements.analyseButton.disabled = false;
+    elements.analyseButton.textContent = "Analyse My File";
+    updateModeChip("idle", "Awaiting");
     return;
   }
 
   const wsUrl = `${API_ORIGIN.replace(/^http/, "ws")}/ws/pipeline?file_id=${fileId}`;
-  const backendSucceeded = await runBackendPipelineWithUrl(wsUrl);
-
-  if (!backendSucceeded) {
-    setUploadStatus("Pipeline failed after upload. The benchmark fixture was loaded as a fallback.", true);
-    scheduleRetryAction("quick-analysis");
+  const ok = await runBackendPipelineWithUrl(wsUrl);
+  if (!ok) {
+    setUploadStatus("Analysis server unavailable. Loading demo data as fallback.", true);
     applyFallbackRun();
   } else {
     setUploadStatus(`Analysis complete for ${file.name}.`);
-    setRetryAction("");
   }
-
-  restorePrimaryActions();
-}
-
-function runBackendPipeline() {
-  return runBackendPipelineWithUrl(WS_URL);
+  state.loading = false;
+  elements.analyseButton.disabled = !elements.vcfFileInput.files[0];
+  elements.analyseButton.textContent = "Analyse My File";
 }
 
 async function loadDemo() {
-  if (state.loading) {
-    return;
-  }
-
+  if (state.loading) return;
   resetRunState();
   state.loading = true;
-  elements.loadButton.disabled = true;
-  elements.loadButton.textContent = "Loading...";
-  setRetryAction("");
-  updateStatus(
-    "running",
-    "Trying the local backend first so the demo can use the full pipeline path."
-  );
-  renderAll();
+  setUploadStatus("Connecting to analysis server...");
+  updateModeChip("running", "Connecting...");
+  showPipelineProgress(true);
+  elements.pipelineStatus.textContent = "Trying to connect to the analysis backend...";
 
-  const backendSucceeded = await runBackendPipeline();
-
-  if (!backendSucceeded) {
-    scheduleRetryAction("demo");
+  const ok = await runBackendPipelineWithUrl(WS_URL);
+  if (!ok) {
     applyFallbackRun();
+    setUploadStatus("Loaded demo case (offline mode).");
   } else {
-    setRetryAction("");
+    setUploadStatus("Demo analysis complete.");
   }
+  state.loading = false;
 }
 
-elements.loadButton.addEventListener("click", loadDemo);
-elements.exportButton.addEventListener("click", exportBrief);
-elements.retryLastActionButton.addEventListener("click", () => {
-  void retryLastAction();
+/* ── Export ───────────────────────────────────────────────────────────── */
+
+function buildFallbackReport() {
+  const top = state.candidates[0];
+  const stats = state.variantStats?.stats || {};
+  return `# VaxAgent — Vaccine Exploration Report
+
+## Tumor Profile
+
+- Case: ${state.variantStats?.dataset_name || "Unknown"}
+- Type: ${state.variantStats?.tumor_type || "Unknown"}
+
+## Mutation Summary
+
+- Total mutations: ${formatNumber(stats.total_variants || 0)}
+- Protein-changing: ${formatNumber(stats.missense_mutations || 0)}
+- Candidates screened: ${formatNumber(stats.initial_predictions || 0)}
+- Top targets: ${state.candidates.length}
+
+## Top Vaccine Targets
+
+${state.candidates.map((c) => {
+  const b = bindingLabel(c.ic50_mt);
+  return `### #${c.rank} ${c.gene} ${c.mutation}
+- Binding: ${b.text} (IC50: ${c.ic50_mt} nM)
+- Tumor presence: ${vafLabel(c.tumor_dna_vaf)}
+- ${clonalityLabel(c.clonality)}
+- Score: ${c.priority_score}/100`;
+}).join("\n\n")}
+
+## Vaccine Blueprint
+
+- Construct: ${state.blueprint?.construct_id || "N/A"}
+- Strategy: ${state.blueprint?.strategy || "N/A"}
+- Targets: ${state.blueprint?.antigen_count || state.candidates.length}
+
+## Limitations
+
+${FALLBACK_RUN.limitations.map((l) => `- ${l}`).join("\n")}
+
+## Discussing With Your Veterinarian
+
+- Bring this report to your next oncology appointment
+- Ask about the feasibility of a personalized vaccine approach
+- Discuss which synthesis providers they would recommend
+- Confirm whether your pet's overall health supports immunotherapy
+`;
+}
+
+function exportBrief() {
+  if (state.mode === "backend" && state.reportUrl) {
+    window.open(state.reportUrl, "_blank", "noopener");
+    return;
+  }
+  const blob = new Blob([buildFallbackReport()], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "vaxagent-vaccine-report.md";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* ── Restore pending job ─────────────────────────────────────────────── */
+
+function restorePendingFullAnalysis() {
+  const pending = readPendingFullAnalysis();
+  if (!pending || state.loading) return;
+  resetRunState();
+  state.loading = true;
+  elements.analyseButton.disabled = true;
+  elements.analyseButton.textContent = "Resuming...";
+  setUploadStatus(`Reconnecting to analysis job ${pending.jobId}...`);
+  updateModeChip("running", "Resuming...");
+  if (state.maxUnlockedStep < 2) { state.maxUnlockedStep = 2; }
+  goToStep(2);
+  beginFullAnalysisPolling(pending.jobId, pending.fileName, {
+    startedAt: pending.startedAt,
+    initialLabel: "Reconnecting..."
+  });
+}
+
+/* ── Event wiring ────────────────────────────────────────────────────── */
+
+// Wizard navigation
+elements.wizardBack.addEventListener("click", () => goToStep(state.wizardStep - 1));
+elements.wizardNext.addEventListener("click", () => {
+  if (state.wizardStep === 1 && canAdvance()) {
+    state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 2);
+  }
+  goToStep(state.wizardStep + 1);
 });
-elements.refreshHistoryButton.addEventListener("click", () => {
-  void fetchRunHistory();
+
+// Progress bar step clicks
+elements.progressSteps.querySelectorAll(".wizard-progress-step").forEach((el) => {
+  el.addEventListener("click", () => {
+    const n = Number(el.dataset.step);
+    if (n <= state.maxUnlockedStep) goToStep(n);
+  });
+});
+
+// Step 1: Species
+elements.speciesSelector.querySelectorAll(".species-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    elements.speciesSelector.querySelectorAll(".species-card").forEach((c) => c.classList.remove("is-selected"));
+    card.classList.add("is-selected");
+    state.diagnosis.species = card.dataset.species;
+    updateWizardNav();
+  });
+});
+
+// Step 1: Cancer type
+elements.cancerTypeSelect.addEventListener("change", () => {
+  const val = elements.cancerTypeSelect.value;
+  state.diagnosis.cancerType = val;
+  elements.cancerTypeCustom.hidden = val !== "other";
+  if (val !== "other") {
+    state.diagnosis.cancerTypeCustom = "";
+  }
+
+  // Show sequencing guidance
+  const guidance = SEQUENCING_GUIDANCE[val];
+  if (guidance) {
+    elements.sequencingGuidance.hidden = false;
+    elements.sequencingGuidanceContent.innerHTML = `
+      <p>${guidance.note}</p>
+      <p><strong>Recommended sequencing:</strong> ${guidance.sequencing}</p>
+      <p><strong>Expected mutation burden:</strong> ${guidance.mutations}</p>
+    `;
+  }
+
+  updateWizardNav();
+});
+
+elements.cancerTypeCustom.addEventListener("input", () => {
+  state.diagnosis.cancerTypeCustom = elements.cancerTypeCustom.value;
+});
+
+elements.stageInput.addEventListener("input", () => {
+  state.diagnosis.stage = elements.stageInput.value;
+});
+
+// Step 2: File upload
+elements.dropZone.addEventListener("click", () => elements.vcfFileInput.click());
+elements.dropZone.addEventListener("dragover", (e) => { e.preventDefault(); elements.dropZone.classList.add("is-dragover"); });
+elements.dropZone.addEventListener("dragleave", () => elements.dropZone.classList.remove("is-dragover"));
+elements.dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  elements.dropZone.classList.remove("is-dragover");
+  const file = e.dataTransfer?.files[0];
+  if (file && (file.name.endsWith(".vcf") || file.name.endsWith(".vcf.gz"))) {
+    elements.vcfFileInput.files = e.dataTransfer.files;
+    elements.vcfFileInput.dispatchEvent(new Event("change"));
+  }
 });
 
 elements.vcfFileInput.addEventListener("change", () => {
   const file = elements.vcfFileInput.files[0];
   if (file) {
     elements.fileLabelText.textContent = file.name;
+    elements.fileLabelText.hidden = false;
+    elements.dropZone.classList.add("has-file");
     elements.analyseButton.disabled = false;
     setUploadStatus("");
   } else {
-    elements.fileLabelText.textContent = "Choose .vcf or .vcf.gz file";
+    elements.fileLabelText.hidden = true;
+    elements.dropZone.classList.remove("has-file");
     elements.analyseButton.disabled = true;
   }
 });
 
 elements.analyseButton.addEventListener("click", uploadAndRun);
+elements.tryDemoButton.addEventListener("click", loadDemo);
 
-elements.modeQuickBtn.addEventListener("click", () => setAnalysisMode("quick"));
-elements.modeFullBtn.addEventListener("click", () => {
-  if (!elements.modeFullBtn.disabled) setAnalysisMode("full");
+// Step 4: Export & technical toggle
+elements.exportButton.addEventListener("click", exportBrief);
+elements.toggleTechnical.addEventListener("click", () => {
+  const showing = !elements.technicalDetails.hidden;
+  elements.technicalDetails.hidden = showing;
+  elements.toggleTechnical.textContent = showing ? "Show technical details" : "Hide technical details";
 });
 
-// Check Docker availability and enable Full analysis mode if available
+// Step 3: Raw data toggle
+elements.toggleRawCandidates.addEventListener("click", () => {
+  const showing = !elements.rawCandidatesBlock.hidden;
+  elements.rawCandidatesBlock.hidden = showing;
+  elements.toggleRawCandidates.textContent = showing ? "Show raw data" : "Hide raw data";
+});
+
+// Step 4: Raw data toggle
+elements.toggleRawBlueprint.addEventListener("click", () => {
+  const showing = !elements.rawBlueprintBlock.hidden;
+  elements.rawBlueprintBlock.hidden = showing;
+  elements.toggleRawBlueprint.textContent = showing ? "Show raw data" : "Hide raw data";
+});
+
+// Step 5: Copy letter
+elements.copyLetterButton.addEventListener("click", () => {
+  navigator.clipboard.writeText(elements.vetLetterText.textContent).then(() => {
+    elements.copyLetterButton.textContent = "Copied!";
+    setTimeout(() => { elements.copyLetterButton.textContent = "Copy"; }, 2000);
+  });
+});
+
+// Docker check (enables full-analysis auto-detection)
 checkDockerAvailability().then((dockerOk) => {
-  if (dockerOk) {
-    elements.modeFullBtn.disabled = false;
-    elements.modeFullBtn.title = "";
-  } else {
-    elements.modeFullBtn.disabled = true;
-    elements.modeFullBtn.title = "Docker is not available on this machine — Full analysis requires Docker";
-  }
+  if (dockerOk) _analysisMode = "full";
 });
 
-// ── Reduced motion preference ────────────────────────────────────────
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+/* ── Initialize ──────────────────────────────────────────────────────── */
 
-// ── Directional wizard step transitions ──────────────────────────────
-let _previousStep = -1;
-let _transitionLocked = false;
-
-function goToStep(stepIndex) {
-  if (_transitionLocked) return;
-  if (stepIndex === _previousStep) return;
-
-  const direction = stepIndex > _previousStep ? "forward" : "back";
-  const stepperItems = document.querySelectorAll(".stepper-item");
-
-  if (prefersReducedMotion.matches || _previousStep < 0) {
-    _previousStep = stepIndex;
-    return;
-  }
-
-  _transitionLocked = true;
-
-  const outClass = direction === "forward" ? "slide-out-left" : "slide-out-right";
-  const inClass = direction === "forward" ? "slide-in-right" : "slide-in-left";
-
-  const outEl = stepperItems[_previousStep];
-  const inEl = stepperItems[stepIndex];
-
-  if (outEl) outEl.classList.add(outClass);
-
-  const transitionDelay = 150;
-  setTimeout(() => {
-    if (outEl) outEl.classList.remove(outClass);
-    if (inEl) inEl.classList.add(inClass);
-
-    setTimeout(() => {
-      if (inEl) inEl.classList.remove(inClass);
-      _previousStep = stepIndex;
-      _transitionLocked = false;
-    }, 250);
-  }, transitionDelay);
-}
-
-// ── Initialize Lucide icons ──────────────────────────────────────────
 if (typeof lucide !== "undefined") {
   lucide.createIcons();
 }
 
-updateStatus("idle", state.statusMessage);
-renderAll();
-void fetchRunHistory();
+updateModeChip("idle", "Awaiting");
+updateWizardProgress();
+updateWizardNav();
+renderCandidates();
+renderBlueprint();
 void restorePendingFullAnalysis();
