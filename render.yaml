@@ -20,7 +20,7 @@ services:
   - type: web
     name: vaxagent-frontend
     runtime: static
-    staticPublishPath: .
+    staticPublishPath: frontend
     buildCommand: ""
     headers:
       - path: /*

@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+BENCHMARKS_DIR = Path(__file__).parent.parent.parent / "data" / "benchmarks"
 USE_FIXTURES = os.getenv("USE_FIXTURES", "true").lower() == "true"
 VEP_CACHE_DIR = os.getenv("VEP_CACHE_DIR", "")
 VEP_ASSEMBLY = os.getenv("VEP_ASSEMBLY", "GRCh37")
@@ -24,10 +24,15 @@ VEP_TIMEOUT = int(os.getenv("VEP_TIMEOUT", "7200"))  # 2 hours default
 
 
 def load_candidates_fixture(dataset_id: str = "hcc1395") -> list[dict]:
-    path = FIXTURES_DIR / "pvacseq_candidates.json"
-    with open(path) as f:
-        data = json.load(f)
-    return data.get("candidates", [])
+    benchmark_dir = BENCHMARKS_DIR / dataset_id
+    # Support both naming conventions
+    for name in ("pvacseq_candidates.json", "candidates.json"):
+        path = benchmark_dir / name
+        if path.exists():
+            with open(path) as f:
+                data = json.load(f)
+            return data.get("candidates", [])
+    raise FileNotFoundError(f"No candidates fixture found in {benchmark_dir}")
 
 
 def run_pvacseq(

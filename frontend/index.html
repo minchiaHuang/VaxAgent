@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VaxAgent — Personalized Cancer Vaccine Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <a href="#stepper" class="skip-link">Skip to content</a>
+
+      <!-- Slim persistent header -->
+      <header class="wizard-header">
+        <div class="wizard-header-left">
+          <h1 class="wizard-title">VaxAgent</h1>
+          <p class="wizard-subtitle">Your guide to exploring a personalized cancer vaccine</p>
+        </div>
+        <div class="wizard-header-right">
+          <span class="notice-chip">For educational exploration only</span>
+          <span id="mode-chip" class="mode-chip">Awaiting</span>
+        </div>
+      </header>
+
+      <!-- 5-step progress bar -->
+      <nav class="wizard-progress" aria-label="Wizard progress">
+        <ol id="wizard-progress-steps" class="wizard-progress-steps">
+          <li class="wizard-progress-step is-active" data-step="1">
+            <span class="wizard-dot">1</span>
+            <span class="wizard-step-label">Diagnosis</span>
+          </li>
+          <li class="wizard-progress-step is-locked" data-step="2">
+            <span class="wizard-dot">2</span>
+            <span class="wizard-step-label">Upload</span>
+          </li>
+          <li class="wizard-progress-step is-locked" data-step="3">
+            <span class="wizard-dot">3</span>
+            <span class="wizard-step-label">Targets</span>
+          </li>
+          <li class="wizard-progress-step is-locked" data-step="4">
+            <span class="wizard-dot">4</span>
+            <span class="wizard-step-label">Blueprint</span>
+          </li>
+          <li class="wizard-progress-step is-locked" data-step="5">
+            <span class="wizard-dot">5</span>
+            <span class="wizard-step-label">Next Steps</span>
+          </li>
+        </ol>
+      </nav>
+
+      <!-- Wizard body: one step visible at a time -->
+      <main class="wizard-body">
+
+        <!-- STEP 1: Diagnosis -->
+        <section id="step-diagnosis" class="wizard-step panel is-active" data-step="1">
+          <div class="section-heading">
+            <p class="section-kicker">Step 1</p>
+            <h2>Tell us about the diagnosis</h2>
+            <p class="step-intro">We'll use this to tailor guidance on what sequencing you need and how to interpret results.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Species</label>
+            <div id="species-selector" class="species-selector">
+              <button class="species-card" data-species="dog" type="button">
+                <span class="species-icon">&#128054;</span>
+                <span class="species-name">Dog</span>
+              </button>
+              <button class="species-card" data-species="cat" type="button">
+                <span class="species-icon">&#128049;</span>
+                <span class="species-name">Cat</span>
+              </button>
+              <button class="species-card" data-species="other" type="button">
+                <span class="species-icon">&#128062;</span>
+                <span class="species-name">Other</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="cancer-type-select">Cancer type</label>
+            <select id="cancer-type-select" class="form-select">
+              <option value="" disabled selected>Select a cancer type...</option>
+              <option value="lymphoma">Lymphoma</option>
+              <option value="osteosarcoma">Osteosarcoma</option>
+              <option value="mast_cell_tumor">Mast cell tumor</option>
+              <option value="melanoma">Melanoma</option>
+              <option value="hemangiosarcoma">Hemangiosarcoma</option>
+              <option value="soft_tissue_sarcoma">Soft tissue sarcoma</option>
+              <option value="mammary_carcinoma">Mammary carcinoma</option>
+              <option value="transitional_cell_carcinoma">Transitional cell carcinoma</option>
+              <option value="other">Other</option>
+            </select>
+            <input
+              id="cancer-type-custom"
+              class="form-input"
+              type="text"
+              placeholder="Describe the cancer type..."
+              hidden
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="stage-input">Stage and treatment history <span class="form-optional">(optional)</span></label>
+            <textarea
+              id="stage-input"
+              class="form-textarea"
+              rows="3"
+              placeholder="e.g. Stage III, had one round of chemotherapy, considering further options..."
+            ></textarea>
+          </div>
+
+          <div id="sequencing-guidance" class="guidance-panel" hidden>
+            <h3>What you'll need</h3>
+            <div id="sequencing-guidance-content"></div>
+          </div>
+
+          <details class="education-accordion">
+            <summary>What is tumor sequencing?</summary>
+            <div class="education-content">
+              <p>Tumor sequencing reads the DNA of cancer cells to find mutations — changes that make the tumor different from normal tissue. These mutations can be used to design a vaccine that teaches the immune system to recognize and attack the cancer.</p>
+              <p><strong>What you'll get:</strong> A VCF file (Variant Call Format) listing all the mutations found. This is what you'll upload in the next step.</p>
+            </div>
+          </details>
+
+          <details class="education-accordion">
+            <summary>Where can I get sequencing done?</summary>
+            <div class="education-content">
+              <p>Ask your veterinary oncologist about tumor sequencing options. Several services offer this:</p>
+              <ul>
+                <li><strong>FidoCure</strong> — Veterinary precision medicine, works directly with vet clinics</li>
+                <li><strong>Antech / IDEXX</strong> — Major veterinary diagnostics labs</li>
+                <li><strong>University veterinary hospitals</strong> — Many offer sequencing through their oncology departments</li>
+              </ul>
+              <p><strong>Typical cost:</strong> $800–$2,500 depending on the type of sequencing and provider.</p>
+              <p><strong>Turnaround:</strong> 2–4 weeks from biopsy to results.</p>
+            </div>
+          </details>
+
+          <details class="education-accordion">
+            <summary>How does a personalized cancer vaccine work?</summary>
+            <div class="education-content">
+              <p>Every tumor has unique mutations. Some of these mutations create altered proteins that the immune system can learn to recognize. A personalized vaccine uses these unique protein fragments (called "vaccine targets") to train the immune system to find and destroy cancer cells.</p>
+              <p>This is the same approach used in some human cancer treatments and is being explored in veterinary oncology.</p>
+            </div>
+          </details>
+        </section>
+
+        <!-- STEP 2: Upload -->
+        <section id="step-upload" class="wizard-step panel" data-step="2">
+          <div class="section-heading">
+            <p class="section-kicker">Step 2</p>
+            <h2>Upload your tumor data</h2>
+            <p class="step-intro">Upload the VCF file from your pet's tumor sequencing. We'll analyze it to find potential vaccine targets.</p>
+          </div>
+
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-content">
+              <p class="drop-zone-label">Drag and drop your VCF file here, or click to browse</p>
+              <p class="drop-zone-hint">Accepts .vcf or .vcf.gz files</p>
+              <input type="file" id="vcf-file-input" accept=".vcf,.vcf.gz" />
+            </div>
+            <p id="file-label-text" class="drop-zone-filename" hidden></p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="hla-alleles-input">
+              Immune receptor type (HLA/DLA alleles)
+              <span class="form-optional">(optional for demo)</span>
+            </label>
+            <input
+              type="text"
+              id="hla-alleles-input"
+              class="form-input"
+              placeholder="e.g. DLA-88*001:01 — your sequencing lab can provide this"
+            />
+            <p class="form-hint">
+              These alleles describe your pet's specific immune receptors. If you don't have them, the analysis will use a reference set.
+            </p>
+          </div>
+
+          <div class="upload-action-row">
+            <button id="analyse-button" class="primary-button" disabled>Analyse My File</button>
+            <span class="upload-action-divider">or</span>
+            <button id="try-demo" class="secondary-button">Don't have data yet? Try a benchmark case</button>
+          </div>
+
+          <div id="benchmark-selector" class="benchmark-selector" hidden>
+            <p class="benchmark-selector-label">Select a benchmark dataset:</p>
+            <div id="benchmark-list" class="benchmark-list"></div>
+          </div>
+
+          <div id="pipeline-progress" class="pipeline-progress" hidden>
+            <p id="pipeline-status" class="pipeline-status-text">Connecting to analysis server...</p>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <div class="pipeline-steps-mini" id="pipeline-steps-mini"></div>
+          </div>
+
+          <div id="job-progress-area" class="job-progress-area" hidden>
+            <div class="job-progress-header">
+              <span id="job-progress-label" class="job-progress-label">Running analysis...</span>
+              <span id="job-elapsed" class="job-elapsed"></span>
+            </div>
+            <div class="progress-track">
+              <div id="job-progress-bar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <p id="job-progress-note" class="job-progress-note">
+              This may take 30–60 minutes for a full analysis. You can leave this page open and return later.
+            </p>
+          </div>
+
+          <p id="upload-status" class="upload-status"></p>
+        </section>
+
+        <!-- STEP 3: Candidates / Vaccine Targets -->
+        <section id="step-candidates" class="wizard-step panel" data-step="3">
+          <div class="section-heading">
+            <p class="section-kicker">Step 3</p>
+            <h2>Your top vaccine targets</h2>
+            <p class="step-intro">These are the mutations most likely to make effective vaccine targets, ranked by how well the immune system can recognize them.</p>
+          </div>
+
+          <!-- ═══════ Scene 3a: Funnel Visualization (Visual Explorer) ═══════ -->
+          <div class="scene-container funnel-scene" id="scene-funnel">
+            <div class="section-heading">
+              <p class="section-kicker">Filtering Pipeline</p>
+              <h2 class="scene-heading">What we found in your data</h2>
+            </div>
+            <p class="scene-subheading">
+              Thousands of mutations were filtered down through successive stages to identify the strongest vaccine targets.
+            </p>
+
+            <!-- Desktop: animated SVG -->
+            <div class="funnel-svg-wrap" id="funnel-svg-wrap">
+              <svg class="funnel-viz" id="funnel-viz" viewBox="0 0 600 380" aria-label="Mutation filtering funnel">
+                <defs>
+                  <linearGradient id="funnelGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--ve-primary-soft)" />
+                    <stop offset="100%" stop-color="var(--ve-primary)" stop-opacity="0.2" />
+                  </linearGradient>
+                </defs>
+                <!-- Connector lines (drawn between tiers) -->
+                <path class="funnel-connector" id="fc-1" d="M100,66 L140,110" opacity="0" />
+                <path class="funnel-connector" id="fc-2" d="M500,66 L460,110" opacity="0" />
+                <path class="funnel-connector" id="fc-3" d="M160,166 L200,210" opacity="0" />
+                <path class="funnel-connector" id="fc-4" d="M440,166 L400,210" opacity="0" />
+                <path class="funnel-connector" id="fc-5" d="M220,266 L250,310" opacity="0" />
+                <path class="funnel-connector" id="fc-6" d="M380,266 L350,310" opacity="0" />
+
+                <!-- Tier 1: Total variants -->
+                <g class="funnel-tier" data-tier="1">
+                  <rect class="funnel-bar" data-tier="1" x="40" y="26" width="0" height="40" />
+                  <text class="funnel-count" data-tier="1" x="300" y="46" text-anchor="middle">0</text>
+                  <text class="funnel-label" x="300" y="82" text-anchor="middle">variants found</text>
+                </g>
+                <!-- Tier 2: Protein-changing -->
+                <g class="funnel-tier" data-tier="2">
+                  <rect class="funnel-bar" data-tier="2" x="100" y="120" width="0" height="40" />
+                  <text class="funnel-count" data-tier="2" x="300" y="140" text-anchor="middle">0</text>
+                  <text class="funnel-label" x="300" y="176" text-anchor="middle">change proteins</text>
+                </g>
+                <!-- Tier 3: Candidates screened -->
+                <g class="funnel-tier" data-tier="3">
+                  <rect class="funnel-bar" data-tier="3" x="160" y="220" width="0" height="40" />
+                  <text class="funnel-count" data-tier="3" x="300" y="240" text-anchor="middle">0</text>
+                  <text class="funnel-label" x="300" y="276" text-anchor="middle">potential targets screened</text>
+                </g>
+                <!-- Tier 4: Top targets (emphasized) -->
+                <g class="funnel-tier" data-tier="4">
+                  <rect class="funnel-bar" data-tier="4" x="220" y="320" width="0" height="40" />
+                  <text class="funnel-count" data-tier="4" x="300" y="340" text-anchor="middle">0</text>
+                  <text class="funnel-label" x="300" y="370" text-anchor="middle">top targets selected</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- Mobile: static list -->
+            <div class="funnel-static" id="funnel-static">
+              <ul class="funnel-static-list" id="funnel-static-list"></ul>
+            </div>
+
+            <div class="funnel-explanation" id="funnel-explanation" style="opacity:0"></div>
+          </div>
+
+          <!-- ═══════ Scene 3b: Target Explorer (Visual Explorer) ═══════ -->
+          <div class="scene-container explorer-scene" id="scene-explorer">
+            <div class="section-heading">
+              <p class="section-kicker">Target Explorer</p>
+              <h2 class="scene-heading">Your vaccine targets</h2>
+            </div>
+            <p class="scene-subheading">
+              Each target was checked for immune accessibility. Click a target tab to explore how the immune system can reach it.
+            </p>
+
+            <!-- Desktop: protein schematic -->
+            <div class="explorer-schematic" id="explorer-schematic">
+              <svg id="protein-svg" viewBox="0 0 500 360" aria-label="Protein schematic">
+                <defs>
+                  <linearGradient id="proteinGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="var(--ve-primary-soft)" />
+                    <stop offset="100%" stop-color="#ffffff" />
+                  </linearGradient>
+                  <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feFlood flood-color="#15803d" flood-opacity="0.5" result="color" />
+                    <feComposite in="color" in2="blur" operator="in" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                  <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feFlood flood-color="#a16207" flood-opacity="0.5" result="color" />
+                    <feComposite in="color" in2="blur" operator="in" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <!-- Cell membrane (outer organic blob) -->
+                <ellipse class="protein-membrane" cx="250" cy="180" rx="210" ry="150" />
+
+                <!-- Protein body (inner region) -->
+                <ellipse class="protein-body" cx="250" cy="185" rx="140" ry="100" />
+
+                <!-- Labels -->
+                <text class="schematic-label" x="460" y="50">Cell membrane</text>
+                <path class="schematic-label-connector" d="M458,53 L430,100" />
+                <text class="schematic-label" x="50" y="125">Protein surface</text>
+                <path class="schematic-label-connector" d="M128,127 L145,145" />
+
+                <!-- Mutation marker (positioned dynamically) -->
+                <rect class="mutation-marker" id="mutation-marker" x="0" y="0" width="28" height="28" />
+
+                <!-- Mutation label -->
+                <text id="mutation-label" class="schematic-label" x="0" y="0" font-weight="700" font-size="13"></text>
+              </svg>
+              <div style="text-align:center; margin-top:8px;">
+                <span class="surface-badge" id="surface-badge"></span>
+              </div>
+            </div>
+
+            <!-- Target selector tabs -->
+            <div class="explorer-tabs" id="explorer-tabs"></div>
+
+            <!-- Mobile: static cards -->
+            <div class="explorer-static" id="explorer-static">
+              <div class="explorer-static-cards" id="explorer-static-cards"></div>
+            </div>
+
+            <!-- Explanation panel -->
+            <div class="ve-explanation-panel" id="explorer-explanation"></div>
+          </div>
+
+          <div id="summary-bar" class="summary-bar" hidden>
+            <div id="summary-grid" class="summary-grid"></div>
+          </div>
+
+          <div id="candidate-list" class="candidate-list empty-state">
+            Upload your data or try the demo to see vaccine targets.
+          </div>
+
+          <div id="raw-candidates-area" class="raw-data-area" hidden>
+            <button id="toggle-raw-candidates" class="tech-toggle" type="button">Show raw data</button>
+            <pre id="raw-candidates-block" class="raw-data-block" hidden></pre>
+          </div>
+        </section>
+
+        <!-- STEP 4: Blueprint -->
+        <section id="step-blueprint" class="wizard-step panel" data-step="4">
+          <!-- ═══════ Scene 4a: Construct Assembly (Visual Explorer) ═══════ -->
+          <div class="scene-container construct-scene" id="scene-construct">
+            <div class="section-heading">
+              <p class="section-kicker">Vaccine Blueprint</p>
+              <h2 class="scene-heading">The mRNA construct</h2>
+            </div>
+            <p class="scene-subheading">
+              Your targets have been assembled into a single mRNA molecule. Click any segment to learn what it does.
+            </p>
+            <div class="construct-svg-wrap" id="construct-svg-wrap">
+              <svg class="construct-viz" id="construct-viz" viewBox="0 0 900 140" aria-label="mRNA construct assembly"></svg>
+            </div>
+            <div class="construct-explanation" id="construct-explanation"></div>
+          </div>
+          <div class="section-heading">
+            <p class="section-kicker">Step 4</p>
+            <h2>Your vaccine blueprint</h2>
+            <p class="step-intro">A summary of what could be synthesized based on the top vaccine targets identified in your pet's tumor.</p>
+          </div>
+
+          <div id="blueprint-card" class="blueprint-card empty-state">
+            The vaccine blueprint will appear after analysis is complete.
+          </div>
+
+          <div id="blueprint-actions" class="blueprint-actions" hidden>
+            <button id="export-brief" class="primary-button" disabled>Download Full Report (PDF)</button>
+            <button id="toggle-technical" class="secondary-button">Show technical details</button>
+          </div>
+
+          <div id="technical-details" class="technical-details" hidden>
+            <h3>Technical construct details</h3>
+            <pre id="sequence-block" class="sequence-block"></pre>
+          </div>
+
+          <div id="raw-blueprint-area" class="raw-data-area" hidden>
+            <button id="toggle-raw-blueprint" class="tech-toggle" type="button">Show raw data</button>
+            <pre id="raw-blueprint-block" class="raw-data-block" hidden></pre>
+          </div>
+        </section>
+
+        <!-- STEP 5: Next Steps -->
+        <section id="step-nextsteps" class="wizard-step panel" data-step="5">
+          <div class="section-heading">
+            <p class="section-kicker">Step 5</p>
+            <h2>What to do next</h2>
+            <p class="step-intro">Now that you have vaccine targets identified, here's how to move forward.</p>
+          </div>
+
+          <div class="nextsteps-grid">
+            <article class="nextstep-card">
+              <h3>Talk to your vet</h3>
+              <p>Share your analysis report with your veterinary oncologist. They can help you evaluate whether a personalized vaccine approach makes sense for your pet's situation.</p>
+              <div class="vet-letter" id="vet-letter">
+                <div class="vet-letter-header">
+                  <h4>Template letter for your veterinarian</h4>
+                  <button id="copy-letter" class="secondary-button copy-btn" type="button">Copy</button>
+                </div>
+                <pre class="vet-letter-text" id="vet-letter-text">Dear Dr. [Vet Name],
+
+I've been exploring personalized cancer vaccine options for [Pet Name],
+my [species] diagnosed with [cancer type].
+
+Using tumor sequencing data, I've identified potential vaccine targets
+through computational analysis. I've attached a summary report.
+
+Key points:
+- [N] vaccine targets were identified with strong predicted immune binding
+- This analysis is computational and requires clinical interpretation
+- I would value your expert guidance on next steps
+
+Thank you,
+[Owner Name]</pre>
+              </div>
+            </article>
+
+            <article class="nextstep-card">
+              <h3>Synthesis options</h3>
+              <p>If your vet agrees, these providers can help synthesize custom peptide or mRNA vaccines:</p>
+              <ul class="resource-list">
+                <li><strong>Eleos Biosciences</strong> — Custom peptide cancer vaccines for veterinary use</li>
+                <li><strong>GenScript</strong> — Peptide synthesis services</li>
+                <li><strong>Twist Bioscience</strong> — Gene and mRNA synthesis</li>
+                <li><strong>Local compounding pharmacies</strong> — Ask about custom peptide formulation</li>
+              </ul>
+            </article>
+
+            <article class="nextstep-card">
+              <h3>Timeline and costs</h3>
+              <dl class="timeline-list">
+                <div class="timeline-item">
+                  <dt>Tumor sequencing</dt>
+                  <dd>2–4 weeks from biopsy &middot; $800–$2,500</dd>
+                </div>
+                <div class="timeline-item">
+                  <dt>Computational analysis</dt>
+                  <dd>1–2 hours with VaxAgent</dd>
+                </div>
+                <div class="timeline-item">
+                  <dt>Peptide synthesis</dt>
+                  <dd>2–6 weeks &middot; $500–$3,000</dd>
+                </div>
+                <div class="timeline-item">
+                  <dt>Vet oncology consult</dt>
+                  <dd>Schedule within 1 week of results &middot; $200–$500</dd>
+                </div>
+              </dl>
+              <p class="cost-note">All costs are estimates and vary by provider and region. Verify current pricing directly.</p>
+            </article>
+
+            <article class="nextstep-card">
+              <h3>Community and resources</h3>
+              <ul class="resource-list">
+                <li><strong>FidoCure</strong> — Commercial veterinary precision oncology platform</li>
+                <li><strong>One Health Company</strong> — AI-powered pet cancer diagnostics</li>
+                <li>Ask your vet about clinical trials for cancer immunotherapy in animals</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="disclaimer-panel">
+            <h3>Important limitations</h3>
+            <ul id="limitations-list" class="limitations-list">
+              <li>This tool provides computational predictions only — it is not a diagnosis or treatment plan.</li>
+              <li>All vaccine targets are predictions based on algorithms. They require wet-lab validation.</li>
+              <li>Fewer than 5% of computationally predicted targets may prove effective in practice.</li>
+              <li>A qualified veterinary oncologist must review any treatment decisions.</li>
+              <li>This tool is for educational exploration, not clinical use.</li>
+            </ul>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Persistent bottom navigation -->
+      <footer class="wizard-nav">
+        <button id="wizard-back" class="secondary-button" hidden>Back</button>
+        <div class="wizard-nav-spacer"></div>
+        <button id="wizard-next" class="primary-button">Continue</button>
+      </footer>
+
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flubber@0.4/build/flubber.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

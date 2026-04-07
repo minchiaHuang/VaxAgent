@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "npm run test:backend && npm run test:e2e",
-    "test:backend": "cd backend && .venv/bin/python -m pytest",
+    "test:backend": "cd backend && .venv/bin/python -m pytest ../tests/backend",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

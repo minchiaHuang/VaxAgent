@@ -50,5 +50,5 @@ def test_generate_pdf_writes_pdf_file(tmp_path: Path, monkeypatch) -> None:
     content = Path(output_path).read_bytes()
 
     assert content.startswith(b"%PDF")
-    assert b"VaxAgent Research Brief" in content
+    assert b"Vaccine Exploration Report" in content
     assert b"TP53" in content

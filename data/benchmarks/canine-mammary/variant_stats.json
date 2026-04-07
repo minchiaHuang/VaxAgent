@@ -1,0 +1,35 @@
+{
+  "dataset_id": "canine-mammary",
+  "dataset_name": "Canine Mammary Tumor CMT-B001",
+  "species": "canine",
+  "source": "Figshare collection 4543784 (Scientific Data, 2019)",
+  "tumor_type": "Mammary carcinoma",
+  "breed": "Mixed breed",
+  "dla_alleles": [
+    "DLA-88*034:01",
+    "DLA-88*50101"
+  ],
+  "stats": {
+    "total_variants": 4137,
+    "somatic_snvs": 2891,
+    "missense_mutations": 1523,
+    "frameshift_indels": 214,
+    "nonsense_mutations": 98,
+    "splice_site_variants": 67,
+    "initial_predictions": 278,
+    "high_confidence_candidates": 64,
+    "shortlisted_candidates": 10,
+    "median_ic50_mt": 215.6,
+    "median_tumor_dna_vaf": 0.28,
+    "median_gene_expression_tpm": 14.3
+  },
+  "top_mutated_genes": [
+    "TP53", "PIK3CA", "KRAS", "PTEN", "CDH1",
+    "APC", "BRCA2", "RB1", "ERBB2", "MYC"
+  ],
+  "tumor_mutation_burden": "Moderate (28.4 mutations/Mb)",
+  "reference_genome": "CanFam3.1",
+  "pipeline_version": "NetMHCpan 4.1 (precomputed fixture)",
+  "prediction_algorithms": ["NetMHCpan"],
+  "binding_threshold_nm": 500
+}

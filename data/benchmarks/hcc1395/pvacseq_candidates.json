@@ -52,7 +52,7 @@
       "transcript": "ENST00000263967",
       "peptide_length": 9,
       "mt_epitope_seq": "IKDFSKIVSL",
-      "wt_epitope_seq": "IKDFSEIVSЛ",
+      "wt_epitope_seq": "IKDFSEIVSL",
       "hla_allele": "HLA-B*45:01",
       "ic50_mt": 78.6,
       "ic50_wt": 6220.1,
