@@ -209,6 +209,7 @@ const state = {
   // Wizard
   wizardStep: 1,
   maxUnlockedStep: 1,
+  audience: "pet_owner",
   diagnosis: { species: "", cancerType: "", cancerTypeCustom: "", stage: "", treatmentHistory: "" },
 
   // Pipeline data
@@ -542,6 +543,9 @@ function renderMiniSteps() {
     const whyBtn = hasExplanation
       ? `<button class="why-toggle-mini" data-why-step="${step.key}" type="button" title="Why this step?">Why?</button>`
       : "";
+    const explainBtn = status === "complete"
+      ? `<button class="explain-btn step-explain-btn" data-explain-step="${step.key}" type="button">Why?</button>`
+      : "";
     const rawBtn = hasRaw
       ? `<button class="raw-toggle-mini" data-raw-step-btn="${step.key}" type="button">raw</button>`
       : "";
@@ -553,7 +557,7 @@ function renderMiniSteps() {
       : "";
 
     return `<div class="mini-step-wrapper">
-      <span class="mini-step ${cls}" data-step-key="${step.key}">${step.title}${whyBtn}${rawBtn}</span>
+      <span class="mini-step ${cls}" data-step-key="${step.key}">${step.title}${whyBtn}${explainBtn}${rawBtn}</span>
       ${explanationPanel}
       ${hasRaw ? `<pre class="raw-data-block" id="raw-step-${step.key}" hidden>${escapeHtml(JSON.stringify(state.stepRawMessages[step.key], null, 2))}</pre>` : ""}
     </div>`;
@@ -579,6 +583,39 @@ function renderMiniSteps() {
       const key = btn.dataset.rawStepBtn;
       const block = document.getElementById(`raw-step-${key}`);
       if (block) block.hidden = !block.hidden;
+    });
+  });
+
+  // Wire step-level AI explain buttons
+  elements.pipelineStepsMini.querySelectorAll(".step-explain-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const step = btn.dataset.explainStep;
+      btn.disabled = true;
+      btn.textContent = "Thinking\u2026";
+      try {
+        const res = await fetch(`${API_ORIGIN}/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context: state.variantStats || {},
+            question: `explain_step_${step}`
+          })
+        });
+        const data = await res.json();
+        btn.textContent = "Why?";
+        btn.disabled = false;
+        let el = btn.nextElementSibling;
+        if (!el || !el.classList.contains("explain-response")) {
+          el = document.createElement("p");
+          el.className = "explain-response";
+          btn.after(el);
+        }
+        el.textContent = data.explanation || data.error || "No explanation available.";
+      } catch (_err) {
+        btn.textContent = "Why?";
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -622,6 +659,39 @@ function buildCandidateNarrative(candidate) {
   };
 }
 
+function scoringBars(c) {
+  const bindingPct = Math.max(0, Math.min(100, (1 - c.ic50_mt / 500) * 100));
+  const presencePct = Math.min(100, (c.tumor_dna_vaf || 0) * 200);
+  const activityPct = Math.min(100, (c.gene_expression_tpm || 0) / 50 * 100);
+  const specificityPct = Math.min(100, Math.log10(Math.max(1, c.fold_change || 1)) / Math.log10(500) * 100);
+
+  const label = (pct) => pct > 75 ? 'Excellent' : pct > 50 ? 'Strong' : pct > 25 ? 'Moderate' : 'Low';
+
+  return `
+    <div class="scoring-bars">
+      <div class="score-factor">
+        <span class="factor-label">Binding strength</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${bindingPct}%"></div></div>
+        <span class="factor-rating">${label(bindingPct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Tumor presence</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${presencePct}%"></div></div>
+        <span class="factor-rating">${label(presencePct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Gene activity</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${activityPct}%"></div></div>
+        <span class="factor-rating">${label(activityPct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Immune specificity</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${specificityPct}%"></div></div>
+        <span class="factor-rating">${label(specificityPct)}</span>
+      </div>
+    </div>`;
+}
+
 function renderCandidates() {
   if (!state.candidates.length) {
     elements.candidateList.className = "candidate-list empty-state";
@@ -648,9 +718,14 @@ function renderCandidates() {
     `).join("");
   }
 
-  // Candidate cards
+  // Show ranking explainer
+  document.getElementById('ranking-explainer')?.removeAttribute('hidden');
+
+  // Origin badge + Candidate cards
+  const isDemo = state.mode === "fallback";
   elements.candidateList.className = "candidate-list";
-  elements.candidateList.innerHTML = state.candidates.map((c) => {
+  const originBadge = `<div class="origin-badge ${isDemo ? 'is-benchmark' : 'is-uploaded'}">${isDemo ? 'Benchmark data' : 'From your file'}</div>`;
+  elements.candidateList.innerHTML = originBadge + state.candidates.map((c) => {
     const selected = c.rank === state.selectedCandidateRank ? "is-selected" : "";
     const binding = bindingLabel(c.ic50_mt);
     const narrative = buildCandidateNarrative(c);
@@ -672,6 +747,7 @@ function renderCandidates() {
             <div class="candidate-detail">
               <p>${narrative.summary}</p>
               <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
+              ${scoringBars(c)}
               <div class="guardrail">${narrative.caution}</div>
               <div class="candidate-explain-row">
                 <button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_priority_score" type="button">Why this score?</button>
@@ -808,6 +884,9 @@ function renderBlueprint() {
   elements.blueprintActions.hidden = false;
   elements.exportButton.disabled = !(state.reportUrl || state.mode === "fallback");
   elements.sequenceBlock.textContent = bp.sequence_preview;
+
+  // Show explain-blueprint button
+  document.getElementById("explain-blueprint")?.removeAttribute("hidden");
 
   // Raw data for Step 4
   elements.rawBlueprintArea.hidden = false;
@@ -1724,6 +1803,10 @@ function applyPipelineMessage(message) {
   if (message.step && state.stepStatuses[message.step] !== undefined) {
     state.stepStatuses[message.step] = message.status;
   }
+  // Show prediction context when pvacseq starts
+  if (message.step === "pvacseq" && message.status === "running") {
+    document.getElementById('prediction-context')?.removeAttribute('hidden');
+  }
   if (message.explanation) {
     state.stepExplanations[message.step] = message.explanation;
   }
@@ -1733,6 +1816,15 @@ function applyPipelineMessage(message) {
 
   if (message.step === "load_dataset" && message.status === "complete") {
     state.variantStats = message.data;
+    // Pre-fill alleles from benchmark if the input is empty
+    const alleleInput = elements.hlaAllelesInput;
+    if (alleleInput && !alleleInput.value) {
+      const alleles = state.variantStats?.hla_alleles || state.variantStats?.dla_alleles || [];
+      if (alleles.length > 0) {
+        alleleInput.value = alleles.join(", ");
+        alleleInput.placeholder = "Pre-filled from benchmark \u2014 replace with your pet\u2019s actual alleles";
+      }
+    }
   }
   if (message.step === "ranking" && message.status === "complete") {
     state.candidates = message.data.candidates || [];
@@ -1790,6 +1882,15 @@ function applyFallbackRun() {
   state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((s) => [s.key, "complete"]));
   elements.exportButton.disabled = false;
   updateModeChip("fallback", "Demo mode");
+  // Pre-fill alleles from fallback benchmark if the input is empty
+  const alleleInput = elements.hlaAllelesInput;
+  if (alleleInput && !alleleInput.value) {
+    const alleles = state.variantStats?.hla_alleles || state.variantStats?.dla_alleles || [];
+    if (alleles.length > 0) {
+      alleleInput.value = alleles.join(", ");
+      alleleInput.placeholder = "Pre-filled from benchmark \u2014 replace with your pet\u2019s actual alleles";
+    }
+  }
   showPipelineProgress(false);
 
   state.maxUnlockedStep = 5;
@@ -2142,6 +2243,11 @@ async function loadBenchmark(datasetId) {
 async function loadDemo() {
   if (state.loading) return;
 
+  // If benchmark selector is already showing and has cards, don't re-fetch
+  if (elements.benchmarkSelector && !elements.benchmarkSelector.hidden) {
+    return;
+  }
+
   // Try to show benchmark selector if backend has multiple benchmarks
   const benchmarks = await fetchBenchmarks();
   if (benchmarks && benchmarks.length > 1 && elements.benchmarkSelector) {
@@ -2241,6 +2347,15 @@ function restorePendingFullAnalysis() {
 
 /* ── Event wiring ────────────────────────────────────────────────────── */
 
+// Audience toggle
+document.querySelectorAll('.audience-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.audience-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    state.audience = btn.dataset.audience;
+  });
+});
+
 // Wizard navigation
 elements.wizardBack.addEventListener("click", () => goToStep(state.wizardStep - 1));
 elements.wizardNext.addEventListener("click", () => {
@@ -2337,6 +2452,33 @@ elements.toggleTechnical.addEventListener("click", () => {
   const showing = !elements.technicalDetails.hidden;
   elements.technicalDetails.hidden = showing;
   elements.toggleTechnical.textContent = showing ? "Show technical details" : "Hide technical details";
+});
+
+// Step 4: Explain blueprint
+document.getElementById("explain-blueprint")?.addEventListener("click", async function () {
+  this.disabled = true;
+  this.textContent = "Thinking\u2026";
+  try {
+    const res = await fetch(`${API_ORIGIN}/explain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        context: state.blueprint || {},
+        question: "explain_blueprint"
+      })
+    });
+    const data = await res.json();
+    this.textContent = "Explain this blueprint";
+    this.disabled = false;
+    const responseEl = document.getElementById("blueprint-explain-response");
+    if (responseEl) {
+      responseEl.textContent = data.explanation || data.error || "No explanation available.";
+      responseEl.hidden = false;
+    }
+  } catch (_err) {
+    this.textContent = "Explain this blueprint";
+    this.disabled = false;
+  }
 });
 
 // Step 3: Raw data toggle
