@@ -2243,6 +2243,11 @@ async function loadBenchmark(datasetId) {
 async function loadDemo() {
   if (state.loading) return;
 
+  // If benchmark selector is already showing and has cards, don't re-fetch
+  if (elements.benchmarkSelector && !elements.benchmarkSelector.hidden) {
+    return;
+  }
+
   // Try to show benchmark selector if backend has multiple benchmarks
   const benchmarks = await fetchBenchmarks();
   if (benchmarks && benchmarks.length > 1 && elements.benchmarkSelector) {
