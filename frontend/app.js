@@ -398,8 +398,10 @@ function goToStep(n) {
 
   state.wizardStep = n;
 
-  // Toggle step visibility
+  // Toggle step visibility. Clear any inline display style set by the Visual
+  // Explorer (activateScene) so that the CSS class always wins.
   document.querySelectorAll(".wizard-step").forEach((el) => {
+    el.style.display = "";
     const stepNum = Number(el.dataset.step);
     el.classList.toggle("is-active", stepNum === n);
   });
@@ -407,6 +409,15 @@ function goToStep(n) {
   updateWizardProgress();
   updateWizardNav();
   window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // Re-render step-specific content in case the initial render was skipped
+  // (e.g. due to a caught render error during pipeline_complete handling).
+  if (n === 3 && state.loaded) {
+    try { renderCandidates(); } catch (e) { console.error("[goToStep3] renderCandidates:", e); }
+  }
+  if (n === 4 && state.loaded) {
+    try { renderBlueprint(); } catch (e) { console.error("[goToStep4] renderBlueprint:", e); }
+  }
 }
 
 function updateWizardProgress() {
@@ -594,7 +605,7 @@ function stopPolling() {
 
 /* ── Rendering: Step 3 — Candidates ──────────────────────────────────── */
 
-function buildFriendlyNarrative(candidate) {
+function buildCandidateNarrative(candidate) {
   const binding = bindingLabel(candidate.ic50_mt);
   const structNote = typeof candidate.surface_accessible === "boolean"
     ? surfaceLabel(candidate.surface_accessible)
@@ -642,7 +653,7 @@ function renderCandidates() {
   elements.candidateList.innerHTML = state.candidates.map((c) => {
     const selected = c.rank === state.selectedCandidateRank ? "is-selected" : "";
     const binding = bindingLabel(c.ic50_mt);
-    const narrative = buildFriendlyNarrative(c);
+    const narrative = buildCandidateNarrative(c);
 
     return `
       <div class="candidate-card reveal ${selected}" data-rank="${c.rank}">
@@ -1738,16 +1749,18 @@ function applyPipelineMessage(message) {
     state.loading = false;
     state.currentRunId = message.run_id || message.data?.run_id || "";
     state.activeJob = null;
-    elements.exportButton.disabled = !state.reportUrl;
+    if (elements.exportButton) elements.exportButton.disabled = !state.reportUrl;
     clearPendingFullAnalysis();
     updateModeChip("backend", "Connected");
     showPipelineProgress(false);
 
-    // Unlock all wizard steps and auto-advance to step 3
+    // Unlock all wizard steps and auto-advance to step 3.
+    // Each render is wrapped individually so a failure in one cannot
+    // prevent the others or the step advance from running.
     state.maxUnlockedStep = 5;
-    renderCandidates();
-    renderBlueprint();
-    updateVetLetter();
+    try { renderCandidates(); } catch (e) { console.error("[pipeline] renderCandidates:", e); }
+    try { renderBlueprint(); }  catch (e) { console.error("[pipeline] renderBlueprint:", e); }
+    try { updateVetLetter(); }  catch (e) { console.error("[pipeline] updateVetLetter:", e); }
     goToStep(3);
   }
 
@@ -1848,15 +1861,22 @@ function runBackendPipelineWithUrl(wsUrl, timeoutMs = PIPELINE_CONNECT_TIMEOUT_M
     state.ws.onmessage = (event) => {
       sawAnyMessage = true;
       let message;
-      try { message = JSON.parse(event.data); applyPipelineMessage(message); } catch { return; }
+      try { message = JSON.parse(event.data); } catch { return; }
+
+      // Resolve the promise BEFORE calling applyPipelineMessage so that
+      // DOM/rendering exceptions cannot silently block the success signal.
+      if (message.step === "pipeline_complete" && message.status === "complete") {
+        window.clearTimeout(timeout);
+        if (!settled) { settled = true; resolve(true); }
+        if (state.ws) { state.ws.close(); state.ws = null; }
+      }
       if (message.status === "error") {
         window.clearTimeout(timeout);
         if (!settled) { settled = true; resolve(false); }
       }
-      if (message.step === "pipeline_complete" && message.status === "complete") {
-        window.clearTimeout(timeout);
-        if (state.ws) { state.ws.close(); state.ws = null; }
-        if (!settled) { settled = true; resolve(true); }
+
+      try { applyPipelineMessage(message); } catch (err) {
+        console.error("[pipeline] applyPipelineMessage threw:", err);
       }
     };
 
@@ -1908,6 +1928,12 @@ async function startCompletedJobPipeline(jobId, fileName) {
     updateModeChip("idle", "Awaiting");
   } else {
     setUploadStatus(`Analysis complete for ${fileName}.`);
+    // Guarantee the wizard can advance even if applyPipelineMessage had a render error.
+    if (state.loaded && state.wizardStep === 2) {
+      state.maxUnlockedStep = Math.max(state.maxUnlockedStep, 5);
+      goToStep(3);
+    }
+    updateWizardNav();
   }
 }
 

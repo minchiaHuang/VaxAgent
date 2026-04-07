@@ -92,7 +92,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[CORS_ORIGIN] if CORS_ORIGIN != "*" else ["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -281,7 +281,14 @@ async def submit_pvacseq_job(
     created_at = datetime.now(timezone.utc).isoformat()
     await create_job(job_id, created_at, filename, alleles)
 
-    if _docker_available:
+    # Route to pVACseq only when Docker is available AND all alleles are human (HLA-*).
+    # Non-human alleles (e.g. dog DLA-*) are not supported by the MHCflurry predictor
+    # bundled inside the griffithlab/pvactools image, so we skip Docker and fall back to
+    # the Python-native MHCflurry path (which uses fixture data for unsupported alleles).
+    has_non_human_allele = any(
+        not a.strip().upper().startswith("HLA-") for a in alleles if a.strip()
+    )
+    if _docker_available and not has_non_human_allele:
         asyncio.create_task(
             run_pvacseq_async(job_id, vcf_path, alleles, str(job_dir))
         )
