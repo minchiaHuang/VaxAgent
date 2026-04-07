@@ -38,6 +38,7 @@ from agent.orchestrator import explain_on_demand, explain_step
 from db.database import create_job, get_job, get_run, init_db, list_jobs, list_runs, save_run, update_job
 from pipeline.esmfold_client import enrich_candidates_with_structure
 from pipeline.mrna_designer import design_construct
+from pipeline.mhc_predictor import is_mhcflurry_available, run_mhcflurry_job_async
 from pipeline.pvacseq_runner import (
     load_candidates_fixture,
     load_candidates_from_job,
@@ -232,14 +233,15 @@ async def upload_vcf(
 async def submit_pvacseq_job(
     vcf_file: UploadFile = File(...),
     hla_alleles: str = Form(""),
+    dataset_id: str = Form("hcc1395"),
 ) -> JSONResponse:
-    """Accept a VCF upload and HLA alleles, start a real pVACseq Docker job."""
-    if not _docker_available:
-        return JSONResponse(
-            {"error": "Docker is not available on this machine. pVACseq requires Docker."},
-            status_code=503,
-        )
+    """Accept a VCF upload and HLA alleles, start a binding-prediction job.
 
+    Engine selection:
+      - Docker available  → full pVACseq run (most rigorous)
+      - Docker unavailable, MHCflurry installed → MHCflurry Python predictor
+      - Neither          → 503 (user must install Docker or mhcflurry)
+    """
     filename = vcf_file.filename or ""
     if not (filename.endswith(".vcf") or filename.endswith(".vcf.gz")):
         return JSONResponse(
@@ -250,8 +252,21 @@ async def submit_pvacseq_job(
     alleles = [a.strip() for a in hla_alleles.split(",") if a.strip()]
     if not alleles:
         return JSONResponse(
-            {"error": "At least one HLA allele is required for pVACseq."},
+            {"error": "At least one HLA allele is required for binding prediction."},
             status_code=400,
+        )
+
+    if not _docker_available and not is_mhcflurry_available():
+        return JSONResponse(
+            {
+                "error": (
+                    "Docker is not available and MHCflurry is not installed. "
+                    "Install Docker for full pVACseq analysis, or install the "
+                    "'mhcflurry' Python package (pip install mhcflurry && "
+                    "mhcflurry-downloads fetch) for a Docker-free alternative."
+                ),
+            },
+            status_code=503,
         )
 
     job_id = uuid.uuid4().hex[:8]
@@ -265,11 +280,19 @@ async def submit_pvacseq_job(
 
     created_at = datetime.now(timezone.utc).isoformat()
     await create_job(job_id, created_at, filename, alleles)
-    asyncio.create_task(
-        run_pvacseq_async(job_id, vcf_path, alleles, str(job_dir))
-    )
 
-    return JSONResponse({"job_id": job_id, "status": "queued"})
+    if _docker_available:
+        asyncio.create_task(
+            run_pvacseq_async(job_id, vcf_path, alleles, str(job_dir))
+        )
+        engine = "pvacseq"
+    else:
+        asyncio.create_task(
+            run_mhcflurry_job_async(job_id, vcf_path, alleles, str(job_dir), dataset_id)
+        )
+        engine = "mhcflurry"
+
+    return JSONResponse({"job_id": job_id, "status": "queued", "engine": engine})
 
 
 @app.get("/api/jobs")

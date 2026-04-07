@@ -231,6 +231,7 @@ def _parse_pvacseq_tsv(tsv_path: str) -> list[dict]:
                         "priority_score": 0,
                         "surface_accessible": False,
                         "plddt": 0.0,
+                        "ic50_source": "pvacseq",
                         "explanation": "",
                     }
                 )
