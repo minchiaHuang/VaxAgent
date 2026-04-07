@@ -73,7 +73,8 @@ Then open the frontend — it auto-detects the backend at `http://127.0.0.1:8000
 | **Frontend Fallback** | Loads fixture data, exports markdown | No |
 | **Backend Benchmark** | Full pipeline via WebSocket, PDF export, run history | Yes |
 | **Quick Upload** | Parses your VCF, shows real stats + benchmark candidates | Yes |
-| **Full Analysis** | Real pVACseq via Docker (30-60 min) | Yes + Docker |
+| **Full Analysis (MHCflurry)** | Python-native binding prediction — no Docker needed | Yes + `pip install mhcflurry && mhcflurry-downloads fetch` |
+| **Full Analysis (pVACseq)** | Clinical-grade Docker pipeline (30–60 min) | Yes + Docker |
 
 ## Test Automation
 
@@ -109,11 +110,13 @@ Each benchmark in `data/benchmarks/` includes a `README.md` with provenance and 
 | Quick-upload ranking | Fixture-backed | Real stats + benchmark candidates |
 | Candidate ranking | Real | Composite IC50 + expression + VAF + fold-change |
 | Explanations | Real with fallback | Claude if API key present, static otherwise |
+| On-demand step explanations | Real | "Why?" button on pipeline steps; "Why this score?" on candidates |
 | mRNA blueprint | Real preview | Deterministic construct generation |
 | PDF report | Real | ReportLab-generated |
 | SQLite run history | Real | Saved by backend |
-| pVACseq execution | Real (Full Analysis) | Docker job |
-| Structure prediction | Optional/fallback | ESMFold API or heuristic |
+| MHCflurry binding prediction | Optional | `pip install mhcflurry && mhcflurry-downloads fetch` |
+| pVACseq execution | Real (Full Analysis) | Docker job; auto-falls back to MHCflurry if Docker unavailable |
+| Structure prediction | Tiered | AlphaFold DB → ESMFold API → heuristic; source shown per candidate |
 
 ## Docs
 

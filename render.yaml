@@ -13,6 +13,10 @@ services:
         value: "*"
       - key: ESMFOLD_API_URL
         value: "https://api.esmatlas.com/foldSequence/v1/pdb/"
+      - key: ALPHAFOLD_API_BASE
+        value: "https://alphafold.ebi.ac.uk/api"
+      - key: MHC_BINDING_THRESHOLD_NM
+        value: "500"
       - key: ANTHROPIC_API_KEY
         sync: false   # fill this in the Render dashboard (optional)
 

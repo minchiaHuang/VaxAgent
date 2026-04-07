@@ -41,21 +41,33 @@ The MVP is done only when it is `Handoff Ready`, not just when one local demo ha
   - `load_dataset`
   - `pvacseq`
   - `ranking`
-  - `esmfold`
+  - `esmfold` (with `source_counts` in step data)
   - `mrna_design`
   - `report`
   - `pipeline_complete`
+- each completed step shows a "Why?" button that expands the AI explanation
+- candidate cards show `structure_source` badge (AlphaFold DB / ESMFold / heuristic)
+- "Why this score?" button on selected candidate calls `/explain` and shows result
 - PDF report export works
 - `GET /api/runs` contains the new run
+
+### Structure prediction tiers must pass
+
+- `enrich_candidates_with_structure` returns `structure_source` on every candidate
+- known cancer genes (TP53, KRAS, EGFR etc.) return `structure_source = "alphafold"` in fixture mode
+- unknown genes return `structure_source = "heuristic"` in fixture mode
+- AlphaFold DB lookup skips UniProt API call for genes in static map
 
 ### Uploaded VCF paths must pass
 
 - quick upload accepts `.vcf` and `.vcf.gz`
 - quick upload updates the mutation summary using the uploaded file
 - quick upload clearly states that candidate ranking still comes from the benchmark fixture
-- full analysis requires Docker and at least one HLA allele
+- full analysis with Docker → pVACseq job, `engine = "pvacseq"` in response
+- full analysis without Docker, MHCflurry installed → MHCflurry job, `engine = "mhcflurry"`
+- full analysis without Docker or MHCflurry → 503 with install instructions
 - a valid full-analysis job reaches `complete`
-- the finished job writes `MHC_I.filtered.tsv` and `candidates.json`
+- the finished job writes `candidates.json` with `ic50_source` on each candidate
 - reopening a completed `job_id` loads the live shortlist into the same UI
 
 ## Handoff Success
