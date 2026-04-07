@@ -90,6 +90,57 @@ const SEQUENCING_GUIDANCE = {
   }
 };
 
+/* ── Translation content map (audience-adaptive inline text) ─────────── */
+
+const INLINE_TEXT = {
+  species_context: {
+    pet_owner: "Species determines which immune system we model. Dogs use DLA alleles, humans use HLA \u2014 these are the \u201Clocks\u201D that determine which protein fragments the immune system can detect.",
+    veterinarian: "Species selection determines the MHC system used for binding prediction. Canine analysis uses DLA alleles (e.g. DLA-88*034:01) with NetMHCpan; human uses HLA with pVACseq or MHCflurry.",
+    researcher: "MHC allele system is species-dependent: canine DLA-88 alleles are predicted via NetMHCpan 4.1 (validated for DLA); human HLA alleles use MHCflurry or pVACseq with MHCflurry+NetMHCpan backends."
+  },
+  allele_hint: {
+    pet_owner: "Your pet\u2019s immune alleles (DLA for dogs) are like a fingerprint for their immune system. Each animal has a unique combination. If you don\u2019t have your pet\u2019s allele type, ask your vet about DLA typing \u2014 it\u2019s a simple blood test.",
+    veterinarian: "Enter the patient\u2019s DLA or HLA alleles. DLA typing can be performed via PCR-based assays. Common well-characterized canine alleles include DLA-88*034:01 and DLA-88*50101.",
+    researcher: "Provide MHC Class I alleles in standard nomenclature (e.g. DLA-88*034:01, HLA-A*02:01). Binding predictions use NetMHCpan 4.1 for DLA and MHCflurry/NetMHCpan for HLA alleles."
+  },
+  prediction_context: {
+    pet_owner: "<strong>What\u2019s happening:</strong> Each mutated protein is chopped into small fragments (9 amino acids long). We test whether each fragment fits tightly into your pet\u2019s immune receptor \u2014 like testing which keys fit a lock. Fragments that bind tightly become vaccine target candidates.",
+    veterinarian: "<strong>Binding prediction in progress:</strong> Mutant peptides (8\u201311-mers) are evaluated against the patient\u2019s MHC alleles using neural network predictors. Candidates with predicted IC50 < 500 nM are retained for ranking.",
+    researcher: "<strong>MHC-I binding prediction:</strong> Sliding-window peptide generation (8\u201311-mer) from each missense mutation. IC50 predicted via pan-allele neural networks. Threshold: median IC50 < 500 nM. Fold-change (WT/MT) used for specificity filtering."
+  },
+  ranking_explainer: {
+    pet_owner: "<strong>How we rank targets:</strong> We combine four factors \u2014 binding strength (can the immune system grab it?), tumor presence (is it common across the tumor?), gene activity (is the tumor making it?), and immune specificity (how different from normal proteins?). A good vaccine target scores well on all four.",
+    veterinarian: "<strong>Ranking methodology:</strong> Candidates are scored on four axes: MHC binding affinity (IC50), variant allele frequency (clonality), gene expression (TPM), and fold-change (MT vs WT binding). The composite score weights binding (50%), expression (30%), clonality (15%), and specificity (5%).",
+    researcher: "<strong>Priority scoring:</strong> binding_score = max(0, 50\u00D7(1 \u2212 IC50/500)); expression_score = min(30, TPM/2); clonality_score = VAF\u00D715; specificity_score = min(5, fold_change/10). Total = sum of four components (0\u2013100 scale)."
+  },
+  blueprint_context: {
+    pet_owner: "This follows the same basic design as modern mRNA vaccines (like COVID-19 vaccines), adapted for cancer targets. Each part of the molecule has a specific job \u2014 from protecting the mRNA to directing the immune response.",
+    veterinarian: "The mRNA construct uses a standard multi-epitope cassette design: 5\u2019 cap + alpha-globin UTR + Ii signal peptide + antigen cassettes (GPGPG-linked) + beta-globin 3\u2019 UTR + poly(A)120. Codon-optimized for mammalian expression.",
+    researcher: "Multi-epitope mRNA design: m7GpppN cap, human alpha-globin 5\u2019UTR, MHC-II invariant chain Ii signal peptide (METPAQLLFLLLLWLPDTTG), GPGPG-linked antigen cassettes ordered by priority score, TGA stop, human beta-globin 3\u2019UTR, poly(A)\u00D7120. Codon optimization: most-frequent human codon table."
+  },
+  report_context: {
+    pet_owner: "This report summarizes your complete analysis. Share it with your veterinarian to discuss next steps. It includes the mutation summary, ranked targets with explanations, the vaccine blueprint, and important limitations.",
+    veterinarian: "This report provides a computational neoantigen analysis summary suitable for clinical discussion. Review the candidate ranking rationale and limitations section before making treatment decisions.",
+    researcher: "This report contains the full computational pipeline output: variant statistics, ranked neoantigen candidates with binding predictions, structure accessibility data, and mRNA construct design. All predictions require experimental validation."
+  }
+};
+
+function updateInlineTextForAudience() {
+  const a = state.audience || "pet_owner";
+  const updates = {
+    "species-context": INLINE_TEXT.species_context[a],
+    "allele-hint": INLINE_TEXT.allele_hint[a],
+    "prediction-context": INLINE_TEXT.prediction_context[a],
+    "ranking-explainer-text": INLINE_TEXT.ranking_explainer[a],
+    "blueprint-context": INLINE_TEXT.blueprint_context[a],
+    "report-context": INLINE_TEXT.report_context[a]
+  };
+  for (const [id, html] of Object.entries(updates)) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  }
+}
+
 /* ── Fallback fixture ────────────────────────────────────────────────── */
 
 const FALLBACK_RUN = {
@@ -843,6 +894,36 @@ function renderCandidates() {
 
 /* ── Rendering: Step 4 — Blueprint ───────────────────────────────────── */
 
+function renderBlueprintAnnotations(blueprint) {
+  if (!blueprint || !blueprint.antigen_count) return '';
+  const parts = [
+    { label: "5' Cap", desc: "Protects the mRNA from degradation", color: "var(--primary)" },
+    { label: "5' UTR", desc: "Tells the cell to start reading here", color: "#6366f1" },
+    { label: "Signal peptide", desc: "Directs targets toward immune cells", color: "#0891b2" },
+  ];
+  for (let i = 0; i < (blueprint.antigen_count || 5); i++) {
+    parts.push({ label: `Target ${i+1}`, desc: "Vaccine target from your tumor", color: "#059669" });
+    if (i < (blueprint.antigen_count || 5) - 1) {
+      parts.push({ label: "Linker", desc: "Flexible spacer between targets", color: "#9ca3af" });
+    }
+  }
+  parts.push({ label: "Stop", desc: "Tells the cell to stop reading", color: "#dc2626" });
+  parts.push({ label: "3' UTR", desc: "Stabilizes the mRNA", color: "#6366f1" });
+  parts.push({ label: "Poly(A) tail", desc: "Protects the mRNA and helps it last longer", color: "#f59e0b" });
+
+  return `<div class="construct-annotations">
+    <p class="construct-annotations-title">What each part does:</p>
+    <div class="construct-bar">${parts.map(p =>
+      `<div class="construct-segment" style="background:${p.color}" title="${p.desc}">
+        <span class="segment-label">${p.label}</span>
+      </div>`
+    ).join('')}</div>
+    <div class="construct-legend">${parts.filter((p,i,a) => a.findIndex(x => x.label === p.label) === i).map(p =>
+      `<span class="legend-item"><span class="legend-dot" style="background:${p.color}"></span>${p.label}: ${p.desc}</span>`
+    ).join('')}</div>
+  </div>`;
+}
+
 function renderBlueprint() {
   if (!state.blueprint) {
     elements.blueprintCard.className = "blueprint-card empty-state";
@@ -879,6 +960,7 @@ function renderBlueprint() {
     <ul style="margin-top:14px;padding-left:18px;color:var(--muted);line-height:1.7;">
       ${bp.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
     </ul>
+    ${renderBlueprintAnnotations(bp)}
   `;
 
   elements.blueprintActions.hidden = false;
@@ -2353,6 +2435,14 @@ document.querySelectorAll('.audience-btn').forEach(btn => {
     document.querySelectorAll('.audience-btn').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     state.audience = btn.dataset.audience;
+    updateInlineTextForAudience();
+    // Sync report audience selector
+    const reportRadio = document.querySelector(`input[name="report-audience"][value="${state.audience}"]`);
+    if (reportRadio) {
+      reportRadio.checked = true;
+      document.querySelectorAll('.report-audience-option').forEach(o => o.classList.remove('is-selected'));
+      reportRadio.closest('.report-audience-option')?.classList.add('is-selected');
+    }
   });
 });
 
@@ -2430,21 +2520,52 @@ elements.dropZone.addEventListener("drop", (e) => {
 
 elements.vcfFileInput.addEventListener("change", () => {
   const file = elements.vcfFileInput.files[0];
+  const modeSelector = document.getElementById("analysis-mode-selector");
   if (file) {
     elements.fileLabelText.textContent = file.name;
     elements.fileLabelText.hidden = false;
     elements.dropZone.classList.add("has-file");
     elements.analyseButton.disabled = false;
     setUploadStatus("");
+    if (modeSelector) modeSelector.hidden = false;
   } else {
     elements.fileLabelText.hidden = true;
     elements.dropZone.classList.remove("has-file");
     elements.analyseButton.disabled = true;
+    if (modeSelector) modeSelector.hidden = true;
   }
+});
+
+// Analysis mode radio buttons
+document.querySelectorAll('input[name="analysis-mode"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    document.querySelectorAll('.analysis-mode-card').forEach(c => c.classList.remove('is-selected'));
+    radio.closest('.analysis-mode-card')?.classList.add('is-selected');
+    if (radio.value === "benchmark") {
+      _analysisMode = "quick";
+      elements.tryDemoButton.click();
+    } else {
+      _analysisMode = radio.value;
+    }
+  });
 });
 
 elements.analyseButton.addEventListener("click", uploadAndRun);
 elements.tryDemoButton.addEventListener("click", loadDemo);
+
+// Report audience selector
+document.querySelectorAll('input[name="report-audience"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    document.querySelectorAll('.report-audience-option').forEach(o => o.classList.remove('is-selected'));
+    radio.closest('.report-audience-option')?.classList.add('is-selected');
+    state.audience = radio.value;
+    updateInlineTextForAudience();
+    // Sync header audience toggle
+    document.querySelectorAll('.audience-btn').forEach(b => b.classList.remove('is-active'));
+    const headerBtn = document.querySelector(`.audience-btn[data-audience="${state.audience}"]`);
+    if (headerBtn) headerBtn.classList.add('is-active');
+  });
+});
 
 // Step 4: Export & technical toggle
 elements.exportButton.addEventListener("click", exportBrief);
@@ -2519,4 +2640,5 @@ updateWizardProgress();
 updateWizardNav();
 renderCandidates();
 renderBlueprint();
+updateInlineTextForAudience();
 void restorePendingFullAnalysis();

@@ -2246,3 +2246,44 @@ h3 {
     opacity: 0.5;
   }
 }
+
+/* ── Analysis mode selector (Task 2) ──────────────────────────────────── */
+
+.analysis-mode-selector { margin-top: 16px; }
+.analysis-mode-label { font-size: 0.92rem; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.analysis-mode-options { display: flex; flex-direction: column; gap: 8px; }
+.analysis-mode-card {
+  display: block; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius-component);
+  background: var(--panel); cursor: pointer; transition: border-color var(--duration-micro);
+}
+.analysis-mode-card:hover { border-color: var(--primary); }
+.analysis-mode-card.is-selected { border-color: var(--primary); background: var(--bg-subtle); }
+.analysis-mode-card input[type="radio"] { display: none; }
+.analysis-mode-card strong { display: block; font-size: 0.92rem; color: var(--ink); margin-bottom: 2px; }
+.analysis-mode-card p { font-size: 0.82rem; color: var(--muted); margin: 0; }
+
+/* ── mRNA Blueprint Annotations (Task 3) ──────────────────────────────── */
+
+.construct-annotations { margin-top: 16px; }
+.construct-annotations-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+.construct-bar { display: flex; border-radius: 6px; overflow: hidden; height: 32px; }
+.construct-segment { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 20px; opacity: 0.85; }
+.construct-segment:hover { opacity: 1; }
+.segment-label { font-size: 0.65rem; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+.construct-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+.legend-item { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Report audience selector (Task 4) ────────────────────────────────── */
+
+.report-audience-selector { margin-bottom: 16px; }
+.report-audience-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.report-audience-option {
+  flex: 1; min-width: 140px; padding: 10px 14px; border: 1px solid var(--line);
+  border-radius: var(--radius-component); cursor: pointer; transition: border-color var(--duration-micro);
+}
+.report-audience-option:hover { border-color: var(--primary); }
+.report-audience-option.is-selected { border-color: var(--primary); background: var(--bg-subtle); }
+.report-audience-option input[type="radio"] { display: none; }
+.report-audience-option strong { display: block; font-size: 0.88rem; color: var(--ink); }
+.report-audience-option span { font-size: 0.78rem; color: var(--muted); }
