@@ -2184,6 +2184,31 @@ h3 {
   margin-bottom: 16px;
 }
 
+/* ── Explain response (step + blueprint) ─────────────────────────────── */
+
+.explain-response {
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 8px 0;
+  padding: 10px 14px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-component);
+  border-left: 3px solid var(--accent);
+  animation: fadeIn 0.3s ease;
+}
+
+.step-explain-btn {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Mobile breakpoint: static fallbacks ───────────────────────────────── */
 
 @media (max-width: 768px) {

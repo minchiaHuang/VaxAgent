@@ -307,6 +307,8 @@
               Each target was checked for immune accessibility. Click a target tab to explore how the immune system can reach it.
             </p>
 
+            <p class="inline-context">Even if a target looks promising on paper, the immune system can only reach it if it's exposed on the cell surface — like a handle on the outside of a door. Targets buried inside the protein are less likely to work as vaccine targets. The confidence score tells you how much to trust the structural prediction.</p>
+
             <!-- Desktop: protein schematic -->
             <div class="explorer-schematic" id="explorer-schematic">
               <svg id="protein-svg" viewBox="0 0 500 360" aria-label="Protein schematic">
@@ -414,6 +416,9 @@
           <div id="blueprint-card" class="blueprint-card empty-state">
             The vaccine blueprint will appear after analysis is complete.
           </div>
+
+          <button id="explain-blueprint" class="explain-btn" type="button" hidden>Explain this blueprint</button>
+          <p id="blueprint-explain-response" class="explain-response" hidden></p>
 
           <div id="blueprint-actions" class="blueprint-actions" hidden>
             <button id="export-brief" class="primary-button" disabled>Download Full Report (PDF)</button>

@@ -543,6 +543,9 @@ function renderMiniSteps() {
     const whyBtn = hasExplanation
       ? `<button class="why-toggle-mini" data-why-step="${step.key}" type="button" title="Why this step?">Why?</button>`
       : "";
+    const explainBtn = status === "complete"
+      ? `<button class="explain-btn step-explain-btn" data-explain-step="${step.key}" type="button">Why?</button>`
+      : "";
     const rawBtn = hasRaw
       ? `<button class="raw-toggle-mini" data-raw-step-btn="${step.key}" type="button">raw</button>`
       : "";
@@ -554,7 +557,7 @@ function renderMiniSteps() {
       : "";
 
     return `<div class="mini-step-wrapper">
-      <span class="mini-step ${cls}" data-step-key="${step.key}">${step.title}${whyBtn}${rawBtn}</span>
+      <span class="mini-step ${cls}" data-step-key="${step.key}">${step.title}${whyBtn}${explainBtn}${rawBtn}</span>
       ${explanationPanel}
       ${hasRaw ? `<pre class="raw-data-block" id="raw-step-${step.key}" hidden>${escapeHtml(JSON.stringify(state.stepRawMessages[step.key], null, 2))}</pre>` : ""}
     </div>`;
@@ -580,6 +583,39 @@ function renderMiniSteps() {
       const key = btn.dataset.rawStepBtn;
       const block = document.getElementById(`raw-step-${key}`);
       if (block) block.hidden = !block.hidden;
+    });
+  });
+
+  // Wire step-level AI explain buttons
+  elements.pipelineStepsMini.querySelectorAll(".step-explain-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const step = btn.dataset.explainStep;
+      btn.disabled = true;
+      btn.textContent = "Thinking\u2026";
+      try {
+        const res = await fetch(`${API_ORIGIN}/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context: state.variantStats || {},
+            question: `explain_step_${step}`
+          })
+        });
+        const data = await res.json();
+        btn.textContent = "Why?";
+        btn.disabled = false;
+        let el = btn.nextElementSibling;
+        if (!el || !el.classList.contains("explain-response")) {
+          el = document.createElement("p");
+          el.className = "explain-response";
+          btn.after(el);
+        }
+        el.textContent = data.explanation || data.error || "No explanation available.";
+      } catch (_err) {
+        btn.textContent = "Why?";
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -848,6 +884,9 @@ function renderBlueprint() {
   elements.blueprintActions.hidden = false;
   elements.exportButton.disabled = !(state.reportUrl || state.mode === "fallback");
   elements.sequenceBlock.textContent = bp.sequence_preview;
+
+  // Show explain-blueprint button
+  document.getElementById("explain-blueprint")?.removeAttribute("hidden");
 
   // Raw data for Step 4
   elements.rawBlueprintArea.hidden = false;
@@ -1777,6 +1816,15 @@ function applyPipelineMessage(message) {
 
   if (message.step === "load_dataset" && message.status === "complete") {
     state.variantStats = message.data;
+    // Pre-fill alleles from benchmark if the input is empty
+    const alleleInput = elements.hlaAllelesInput;
+    if (alleleInput && !alleleInput.value) {
+      const alleles = state.variantStats?.hla_alleles || state.variantStats?.dla_alleles || [];
+      if (alleles.length > 0) {
+        alleleInput.value = alleles.join(", ");
+        alleleInput.placeholder = "Pre-filled from benchmark \u2014 replace with your pet\u2019s actual alleles";
+      }
+    }
   }
   if (message.step === "ranking" && message.status === "complete") {
     state.candidates = message.data.candidates || [];
@@ -1834,6 +1882,15 @@ function applyFallbackRun() {
   state.stepStatuses = Object.fromEntries(PIPELINE_STEPS.map((s) => [s.key, "complete"]));
   elements.exportButton.disabled = false;
   updateModeChip("fallback", "Demo mode");
+  // Pre-fill alleles from fallback benchmark if the input is empty
+  const alleleInput = elements.hlaAllelesInput;
+  if (alleleInput && !alleleInput.value) {
+    const alleles = state.variantStats?.hla_alleles || state.variantStats?.dla_alleles || [];
+    if (alleles.length > 0) {
+      alleleInput.value = alleles.join(", ");
+      alleleInput.placeholder = "Pre-filled from benchmark \u2014 replace with your pet\u2019s actual alleles";
+    }
+  }
   showPipelineProgress(false);
 
   state.maxUnlockedStep = 5;
@@ -2390,6 +2447,33 @@ elements.toggleTechnical.addEventListener("click", () => {
   const showing = !elements.technicalDetails.hidden;
   elements.technicalDetails.hidden = showing;
   elements.toggleTechnical.textContent = showing ? "Show technical details" : "Hide technical details";
+});
+
+// Step 4: Explain blueprint
+document.getElementById("explain-blueprint")?.addEventListener("click", async function () {
+  this.disabled = true;
+  this.textContent = "Thinking\u2026";
+  try {
+    const res = await fetch(`${API_ORIGIN}/explain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        context: state.blueprint || {},
+        question: "explain_blueprint"
+      })
+    });
+    const data = await res.json();
+    this.textContent = "Explain this blueprint";
+    this.disabled = false;
+    const responseEl = document.getElementById("blueprint-explain-response");
+    if (responseEl) {
+      responseEl.textContent = data.explanation || data.error || "No explanation available.";
+      responseEl.hidden = false;
+    }
+  } catch (_err) {
+    this.textContent = "Explain this blueprint";
+    this.disabled = false;
+  }
 });
 
 // Step 3: Raw data toggle
