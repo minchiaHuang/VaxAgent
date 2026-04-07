@@ -83,7 +83,7 @@
                 <span class="species-name">Other</span>
               </button>
             </div>
-            <p class="inline-context">Species determines which immune system we model. Dogs use DLA alleles, humans use HLA — these are the "locks" that determine which protein fragments the immune system can detect.</p>
+            <p class="inline-context" id="species-context">Species determines which immune system we model. Dogs use DLA alleles, humans use HLA — these are the "locks" that determine which protein fragments the immune system can detect.</p>
           </div>
 
           <div class="form-group">
@@ -197,6 +197,27 @@
           <div id="benchmark-selector" class="benchmark-selector" hidden>
             <p class="benchmark-selector-label">Select a benchmark dataset:</p>
             <div id="benchmark-list" class="benchmark-list"></div>
+          </div>
+
+          <div id="analysis-mode-selector" class="analysis-mode-selector" hidden>
+            <p class="analysis-mode-label">How should we screen for vaccine targets?</p>
+            <div class="analysis-mode-options">
+              <label class="analysis-mode-card is-selected">
+                <input type="radio" name="analysis-mode" value="quick" checked />
+                <strong>Quick Analysis</strong> (~30 seconds)
+                <p>Runs a neural network on this computer to predict binding. Fast and good for initial screening.</p>
+              </label>
+              <label class="analysis-mode-card">
+                <input type="radio" name="analysis-mode" value="full" />
+                <strong>Full Analysis</strong> (30–60 minutes)
+                <p>Annotates variants first, then runs thorough binding prediction. Requires Docker. More accurate for canine DLA alleles.</p>
+              </label>
+              <label class="analysis-mode-card">
+                <input type="radio" name="analysis-mode" value="benchmark" />
+                <strong>Benchmark Only</strong> (instant)
+                <p>Uses pre-computed results from the benchmark dataset. Great for exploring the workflow, but not from your pet's data.</p>
+              </label>
+            </div>
           </div>
 
           <div id="pipeline-progress" class="pipeline-progress" hidden>
@@ -377,7 +398,7 @@
           </div>
 
           <div id="ranking-explainer" class="ranking-explainer" hidden>
-            <p class="inline-context"><strong>How we rank targets:</strong> We combine four factors — binding strength (can the immune system grab it?), tumor presence (is it common across the tumor?), gene activity (is the tumor making it?), and immune specificity (how different from normal proteins?). A good vaccine target scores well on all four.</p>
+            <p class="inline-context" id="ranking-explainer-text"><strong>How we rank targets:</strong> We combine four factors — binding strength (can the immune system grab it?), tumor presence (is it common across the tumor?), gene activity (is the tumor making it?), and immune specificity (how different from normal proteins?). A good vaccine target scores well on all four.</p>
           </div>
 
           <div id="candidate-list" class="candidate-list empty-state">
@@ -410,7 +431,7 @@
             <p class="section-kicker">Step 4</p>
             <h2>Your vaccine blueprint</h2>
             <p class="step-intro">A summary of what could be synthesized based on the top vaccine targets identified in your pet's tumor.</p>
-            <p class="inline-context">This follows the same basic design as modern mRNA vaccines (like COVID-19 vaccines), adapted for cancer targets. Each part of the molecule has a specific job — from protecting the mRNA to directing the immune response.</p>
+            <p class="inline-context" id="blueprint-context">This follows the same basic design as modern mRNA vaccines (like COVID-19 vaccines), adapted for cancer targets. Each part of the molecule has a specific job — from protecting the mRNA to directing the immune response.</p>
           </div>
 
           <div id="blueprint-card" class="blueprint-card empty-state">
@@ -421,6 +442,26 @@
           <p id="blueprint-explain-response" class="explain-response" hidden></p>
 
           <div id="blueprint-actions" class="blueprint-actions" hidden>
+            <div class="report-audience-selector">
+              <label class="form-label">Report style:</label>
+              <div class="report-audience-options">
+                <label class="report-audience-option is-selected">
+                  <input type="radio" name="report-audience" value="pet_owner" checked />
+                  <strong>For me</strong>
+                  <span>Clear language, what it means for my pet</span>
+                </label>
+                <label class="report-audience-option">
+                  <input type="radio" name="report-audience" value="veterinarian" />
+                  <strong>For my vet</strong>
+                  <span>Clinical vocabulary, evidence references</span>
+                </label>
+                <label class="report-audience-option">
+                  <input type="radio" name="report-audience" value="researcher" />
+                  <strong>For a research team</strong>
+                  <span>Technical detail, methodology, validation</span>
+                </label>
+              </div>
+            </div>
             <button id="export-brief" class="primary-button" disabled>Download Full Report (PDF)</button>
             <button id="toggle-technical" class="secondary-button">Show technical details</button>
           </div>
@@ -444,7 +485,7 @@
             <p class="step-intro">Now that you have vaccine targets identified, here's how to move forward.</p>
           </div>
 
-          <p class="inline-context">This report summarizes your complete analysis. Share it with your veterinarian to discuss next steps. It includes the mutation summary, ranked targets with explanations, the vaccine blueprint, and important limitations.</p>
+          <p class="inline-context" id="report-context">This report summarizes your complete analysis. Share it with your veterinarian to discuss next steps. It includes the mutation summary, ranked targets with explanations, the vaccine blueprint, and important limitations.</p>
 
           <div class="nextsteps-grid">
             <article class="nextstep-card">
