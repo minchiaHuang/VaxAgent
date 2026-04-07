@@ -2624,9 +2624,22 @@ elements.copyLetterButton.addEventListener("click", () => {
   });
 });
 
-// Docker check (enables full-analysis auto-detection)
+// Docker check — inform the analysis mode selector but don't auto-switch mode.
+// The user explicitly picks quick/full/benchmark via the radio buttons.
 checkDockerAvailability().then((dockerOk) => {
-  if (dockerOk) _analysisMode = "full";
+  if (!dockerOk) {
+    // Disable the "full" radio option when Docker is unavailable
+    const fullRadio = document.querySelector('input[name="analysis-mode"][value="full"]');
+    if (fullRadio) {
+      fullRadio.disabled = true;
+      const card = fullRadio.closest('.analysis-mode-card');
+      if (card) {
+        card.style.opacity = "0.5";
+        card.style.cursor = "not-allowed";
+        card.querySelector("p").textContent += " (Docker not available on this machine)";
+      }
+    }
+  }
 });
 
 /* ── Initialize ──────────────────────────────────────────────────────── */
