@@ -902,6 +902,18 @@ h3 {
   color: var(--muted);
 }
 
+.binding-badge.structure-source-badge.is-alphafold {
+  background: #e8f0fe;
+  color: #1a56db;
+  font-weight: 600;
+}
+
+.binding-badge.structure-source-badge.is-esmfold {
+  background: #fdf3e7;
+  color: #b45309;
+  font-weight: 600;
+}
+
 .candidate-score {
   min-width: 72px;
   padding: 10px;

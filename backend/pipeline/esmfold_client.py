@@ -1,15 +1,28 @@
-"""ESMFold API client — predicts protein structure accessibility for candidates.
+"""Tiered structure prediction client for vaccine target candidates.
 
-Uses the public Meta ESMFold API. Falls back to fixture pLDDT values
-if the API is unavailable or USE_FIXTURES is set.
+Prediction tiers (attempted in order):
+  1. AlphaFold DB — precomputed, highest quality (gene-name lookup).
+  2. ESMFold API  — live folding of novel peptide sequences (sequence lookup).
+  3. Heuristic    — amino-acid composition estimate (always available).
+
+Each enriched candidate gains three new fields:
+  - plddt           (float)  mean predicted local distance difference test score
+  - surface_accessible (bool)  whether the epitope is likely solvent-exposed
+  - structure_source   (str)  "alphafold" | "esmfold" | "heuristic"
+
+In fixture mode (USE_FIXTURES=true) all predictions use the heuristic or
+AlphaFold fixture table without any network calls.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+from typing import Optional
 
 import httpx
+
+from pipeline.alphafold_client import get_alphafold_plddt
 
 ESMFOLD_API_URL = os.getenv(
     "ESMFOLD_API_URL",
@@ -17,19 +30,75 @@ ESMFOLD_API_URL = os.getenv(
 )
 USE_FIXTURES = os.getenv("USE_FIXTURES", "true").lower() == "true"
 
-# Timeout per sequence — the public API can be slow
 REQUEST_TIMEOUT = 30.0
 
 
-async def get_structure_plddt(sequence: str) -> tuple[float, bool]:
-    """Return (pLDDT, surface_accessible) for a peptide sequence.
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
-    pLDDT > 70 = reliable prediction; surface_accessible = True means
-    the epitope region is solvent-exposed based on secondary structure heuristics.
+
+async def get_structure_plddt(
+    sequence: str,
+    gene: Optional[str] = None,
+) -> tuple[float, bool, str]:
+    """Return (pLDDT, surface_accessible, structure_source) for a peptide.
+
+    Tries AlphaFold DB → ESMFold API → heuristic, returning the first success.
     """
-    if USE_FIXTURES:
-        return _estimate_plddt_heuristic(sequence), _estimate_surface(sequence)
+    # Tier 1: AlphaFold DB (gene-level; highest quality)
+    if gene:
+        af_plddt = await get_alphafold_plddt(gene)
+        if af_plddt is not None:
+            return af_plddt, af_plddt > 70, "alphafold"
 
+    # Tier 2: ESMFold API (sequence-level; requires network, skipped in fixtures)
+    if not USE_FIXTURES:
+        esm_plddt = await _fetch_esmfold_plddt(sequence)
+        if esm_plddt is not None:
+            return esm_plddt, esm_plddt > 70, "esmfold"
+
+    # Tier 3: Heuristic estimate (always available)
+    plddt = _estimate_plddt_heuristic(sequence)
+    return plddt, _estimate_surface(sequence), "heuristic"
+
+
+async def enrich_candidates_with_structure(candidates: list[dict]) -> list[dict]:
+    """Add pLDDT, surface_accessible, and structure_source fields to each candidate.
+
+    Candidates that already carry a non-zero pLDDT are still updated with a
+    structure_source label but their existing pLDDT is preserved.
+    """
+    tasks = [
+        get_structure_plddt(c["mt_epitope_seq"], gene=c.get("gene"))
+        for c in candidates
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for candidate, result in zip(candidates, results):
+        if isinstance(result, Exception) or result is None:
+            candidate.setdefault("structure_source", "heuristic")
+            continue
+
+        plddt, surface, source = result
+
+        if candidate.get("plddt", 0) == 0.0:
+            candidate["plddt"] = round(plddt, 1)
+        if not candidate.get("surface_accessible"):
+            candidate["surface_accessible"] = surface
+        # Always record source so the frontend can display it.
+        candidate["structure_source"] = source
+
+    return candidates
+
+
+# ---------------------------------------------------------------------------
+# ESMFold tier
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_esmfold_plddt(sequence: str) -> Optional[float]:
+    """Call the public ESMFold API and return mean pLDDT, or None on failure."""
     try:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             response = await client.post(
@@ -38,28 +107,14 @@ async def get_structure_plddt(sequence: str) -> tuple[float, bool]:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             response.raise_for_status()
-            plddt = _parse_plddt_from_pdb(response.text)
-            surface = plddt > 70
-            return plddt, surface
+            return _parse_plddt_from_pdb(response.text)
     except Exception:
-        return _estimate_plddt_heuristic(sequence), _estimate_surface(sequence)
+        return None
 
 
-async def enrich_candidates_with_structure(candidates: list[dict]) -> list[dict]:
-    """Add pLDDT and surface_accessible fields to each candidate."""
-    tasks = [get_structure_plddt(c["mt_epitope_seq"]) for c in candidates]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for candidate, result in zip(candidates, results):
-        if isinstance(result, Exception) or result is None:
-            continue
-        plddt, surface = result
-        if candidate.get("plddt", 0) == 0.0:
-            candidate["plddt"] = round(plddt, 1)
-        if not candidate.get("surface_accessible"):
-            candidate["surface_accessible"] = surface
-
-    return candidates
+# ---------------------------------------------------------------------------
+# Utility / heuristic functions (kept for tests and fallback)
+# ---------------------------------------------------------------------------
 
 
 def _parse_plddt_from_pdb(pdb_text: str) -> float:

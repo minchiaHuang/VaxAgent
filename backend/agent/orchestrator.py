@@ -34,9 +34,11 @@ FALLBACK_EXPLANATIONS: dict[str, str] = {
     ),
     "esmfold": (
         "We checked whether each target protein fragment is physically accessible on "
-        "the cell surface. Even if a target looks promising on paper, the immune system "
-        "can only reach it if it's exposed on the outside of the cell. Targets that are "
-        "buried inside the protein structure are less likely to work as vaccine targets."
+        "the cell surface using a three-step process: first we looked up precomputed "
+        "structures from the AlphaFold database, then used the ESMFold AI model for any "
+        "remaining sequences, and fell back to a composition estimate if needed. "
+        "Targets that are buried inside the protein structure are less likely to work "
+        "as vaccine targets."
     ),
     "mrna_design": (
         "We assembled the top 5 targets into a single vaccine blueprint. The design "
@@ -102,7 +104,10 @@ async def _call_claude(step: str, context: dict) -> str:
         ),
         "esmfold": (
             "Explain what the protein structure check tells us about whether the immune "
-            "system can physically reach each vaccine target. Use an everyday analogy."
+            "system can physically reach each vaccine target. Use an everyday analogy. "
+            f"Structure sources used: {context.get('source_counts', {})}. "
+            "If AlphaFold data was available, mention that we used precomputed structures "
+            "from a world-leading protein database."
         ),
         "mrna_design": (
             f"Explain the vaccine blueprint design step. "

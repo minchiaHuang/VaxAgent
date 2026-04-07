@@ -109,31 +109,31 @@ const FALLBACK_RUN = {
   },
   candidates: [
     {
-      rank: 1, gene: "TP53", mutation: "R248W", mt_epitope_seq: "SVVVPWEPPL",
+      rank: 1, gene: "TP53", mutation: "R248W", structure_source: "alphafold", mt_epitope_seq: "SVVVPWEPPL",
       hla_allele: "HLA-A*29:02", ic50_mt: 45.2, fold_change: 217.7,
       gene_expression_tpm: 38.2, tumor_dna_vaf: 0.48, clonality: "clonal",
       priority_score: 76, plddt: 82.4, surface_accessible: true
     },
     {
-      rank: 2, gene: "PIK3CA", mutation: "E545K", mt_epitope_seq: "IKDFSKIVSL",
+      rank: 2, gene: "PIK3CA", mutation: "E545K", structure_source: "alphafold", mt_epitope_seq: "IKDFSKIVSL",
       hla_allele: "HLA-B*45:01", ic50_mt: 78.6, fold_change: 79.1,
       gene_expression_tpm: 31.5, tumor_dna_vaf: 0.42, clonality: "clonal",
       priority_score: 70, plddt: 78.9, surface_accessible: true
     },
     {
-      rank: 3, gene: "BRCA1", mutation: "T1685I", mt_epitope_seq: "QMFISVVNL",
+      rank: 3, gene: "BRCA1", mutation: "T1685I", structure_source: "alphafold", mt_epitope_seq: "QMFISVVNL",
       hla_allele: "HLA-A*29:02", ic50_mt: 124.3, fold_change: 36.7,
       gene_expression_tpm: 18.7, tumor_dna_vaf: 0.39, clonality: "clonal",
       priority_score: 60, plddt: 74.2, surface_accessible: true
     },
     {
-      rank: 4, gene: "PTEN", mutation: "R130Q", mt_epitope_seq: "KMLQQDKMF",
+      rank: 4, gene: "PTEN", mutation: "R130Q", structure_source: "alphafold", mt_epitope_seq: "KMLQQDKMF",
       hla_allele: "HLA-B*45:01", ic50_mt: 198.4, fold_change: 19.2,
       gene_expression_tpm: 22.4, tumor_dna_vaf: 0.35, clonality: "clonal",
       priority_score: 54, plddt: 68.1, surface_accessible: false
     },
     {
-      rank: 5, gene: "RB1", mutation: "R698W", mt_epitope_seq: "LFMDLWRWL",
+      rank: 5, gene: "RB1", mutation: "R698W", structure_source: "alphafold", mt_epitope_seq: "LFMDLWRWL",
       hla_allele: "HLA-A*29:02", ic50_mt: 267.1, fold_change: 11.0,
       gene_expression_tpm: 15.2, tumor_dna_vaf: 0.31, clonality: "subclonal",
       priority_score: 45, plddt: 71.5, surface_accessible: true
@@ -354,6 +354,16 @@ function surfaceLabel(accessible) {
   return accessible
     ? "Reachable by the immune system"
     : "May be harder for the immune system to reach";
+}
+
+function structureSourceBadge(source) {
+  if (!source || source === "heuristic") return "";
+  const labels = {
+    alphafold: { text: "AlphaFold DB", css: "is-alphafold" },
+    esmfold: { text: "ESMFold", css: "is-esmfold" },
+  };
+  const { text, css } = labels[source] || { text: source, css: "" };
+  return `<span class="binding-badge structure-source-badge ${css}" title="Structure prediction source: ${text}">${text}</span>`;
 }
 
 /* ── Utility functions ───────────────────────────────────────────────── */
@@ -615,6 +625,7 @@ function renderCandidates() {
           <div class="candidate-badges">
             <span class="binding-badge ${binding.css}">${binding.text}</span>
             ${c.surface_accessible ? '<span class="binding-badge is-strong">Surface accessible</span>' : ""}
+            ${structureSourceBadge(c.structure_source)}
           </div>
           ${selected ? `
             <div class="candidate-detail">
@@ -622,7 +633,7 @@ function renderCandidates() {
               <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
               <div class="guardrail">${narrative.caution}</div>
               <button class="tech-toggle" data-tech-rank="${c.rank}" type="button">Show technical values</button>
-              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
+              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Structure: ${c.structure_source || "heuristic"} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
             </div>
           ` : ""}
         </div>
