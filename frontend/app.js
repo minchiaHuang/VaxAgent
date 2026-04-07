@@ -525,13 +525,43 @@ function renderMiniSteps() {
   elements.pipelineStepsMini.innerHTML = PIPELINE_STEPS.map((step) => {
     const status = state.stepStatuses[step.key] || "pending";
     const cls = status === "complete" ? "is-complete" : status === "running" ? "is-running" : "";
+    const hasExplanation = status === "complete" && state.stepExplanations[step.key];
     const hasRaw = state.stepRawMessages[step.key] && status === "complete";
-    return `<span class="mini-step ${cls}" ${hasRaw ? `data-raw-step="${step.key}"` : ""}>${step.title}${hasRaw ? ' <button class="raw-toggle-mini" data-raw-step-btn="' + step.key + '" type="button">raw</button>' : ""}</span>`;
-  }).join("") + Object.keys(state.stepRawMessages).map((key) =>
-    `<pre class="raw-data-block" id="raw-step-${key}" hidden>${escapeHtml(JSON.stringify(state.stepRawMessages[key], null, 2))}</pre>`
-  ).join("");
 
-  // Wire mini raw toggles
+    const whyBtn = hasExplanation
+      ? `<button class="why-toggle-mini" data-why-step="${step.key}" type="button" title="Why this step?">Why?</button>`
+      : "";
+    const rawBtn = hasRaw
+      ? `<button class="raw-toggle-mini" data-raw-step-btn="${step.key}" type="button">raw</button>`
+      : "";
+
+    const explanationPanel = hasExplanation
+      ? `<div class="step-explanation-panel" id="why-step-${step.key}" hidden>
+           <p class="step-explanation-text">${escapeHtml(state.stepExplanations[step.key])}</p>
+         </div>`
+      : "";
+
+    return `<div class="mini-step-wrapper">
+      <span class="mini-step ${cls}" data-step-key="${step.key}">${step.title}${whyBtn}${rawBtn}</span>
+      ${explanationPanel}
+      ${hasRaw ? `<pre class="raw-data-block" id="raw-step-${step.key}" hidden>${escapeHtml(JSON.stringify(state.stepRawMessages[step.key], null, 2))}</pre>` : ""}
+    </div>`;
+  }).join("");
+
+  // Wire "Why?" toggles
+  elements.pipelineStepsMini.querySelectorAll("[data-why-step]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const key = btn.dataset.whyStep;
+      const panel = document.getElementById(`why-step-${key}`);
+      if (panel) {
+        panel.hidden = !panel.hidden;
+        btn.textContent = panel.hidden ? "Why?" : "Hide";
+      }
+    });
+  });
+
+  // Wire raw toggles
   elements.pipelineStepsMini.querySelectorAll("[data-raw-step-btn]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -632,8 +662,14 @@ function renderCandidates() {
               <p>${narrative.summary}</p>
               <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
               <div class="guardrail">${narrative.caution}</div>
+              <div class="candidate-explain-row">
+                <button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_priority_score" type="button">Why this score?</button>
+                ${c.structure_source && c.structure_source !== "heuristic" ? `<button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_structure_source" type="button">About ${c.structure_source === "alphafold" ? "AlphaFold" : "ESMFold"} data</button>` : ""}
+                ${c.ic50_source && c.ic50_source !== "fixture" ? `<button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_ic50_source" type="button">About ${c.ic50_source}</button>` : ""}
+              </div>
+              <div class="candidate-ai-explanation" id="ai-explain-${c.rank}" hidden></div>
               <button class="tech-toggle" data-tech-rank="${c.rank}" type="button">Show technical values</button>
-              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Structure: ${c.structure_source || "heuristic"} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
+              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Structure: ${c.structure_source || "heuristic"} | Prediction: ${c.ic50_source || "fixture"} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
             </div>
           ` : ""}
         </div>
@@ -648,7 +684,7 @@ function renderCandidates() {
   // Wire click handlers
   elements.candidateList.querySelectorAll("[data-rank]").forEach((card) => {
     card.addEventListener("click", (e) => {
-      if (e.target.closest(".tech-toggle")) return;
+      if (e.target.closest(".tech-toggle") || e.target.closest(".explain-btn")) return;
       state.selectedCandidateRank = Number(card.dataset.rank);
       renderCandidates();
     });
@@ -660,6 +696,56 @@ function renderCandidates() {
       const rank = btn.dataset.techRank;
       const el = document.getElementById(`tech-${rank}`);
       if (el) el.classList.toggle("is-visible");
+    });
+  });
+
+  // Wire on-demand AI explanation buttons on candidate cards
+  elements.candidateList.querySelectorAll(".explain-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const rank = Number(btn.dataset.explainRank);
+      const question = btn.dataset.explainQ;
+      const candidate = state.candidates.find((c) => c.rank === rank);
+      const panel = document.getElementById(`ai-explain-${rank}`);
+      if (!candidate || !panel) return;
+
+      btn.disabled = true;
+      btn.textContent = "Loading…";
+      panel.hidden = false;
+      panel.innerHTML = '<span class="explain-loading">Generating explanation…</span>';
+
+      try {
+        const context = {
+          gene: candidate.gene,
+          mutation: candidate.mutation,
+          priority_score: candidate.priority_score,
+          structure_source: candidate.structure_source || "heuristic",
+          ic50_source: candidate.ic50_source || "fixture",
+          plddt: candidate.plddt,
+          ic50_mt: candidate.ic50_mt,
+          hla_allele: candidate.hla_allele,
+          surface_accessible: candidate.surface_accessible,
+        };
+        const res = await fetch(`${API_ORIGIN}/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ context, question }),
+        });
+        const data = await res.json();
+        if (data.explanation) {
+          panel.innerHTML = `<p class="ai-explanation-text">${escapeHtml(data.explanation)}</p>`;
+          btn.textContent = "Hide";
+          btn.addEventListener("click", () => { panel.hidden = !panel.hidden; }, { once: true });
+        } else {
+          panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
+          btn.textContent = "Try again";
+          btn.disabled = false;
+        }
+      } catch (_err) {
+        panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
+        btn.textContent = "Try again";
+        btn.disabled = false;
+      }
     });
   });
 

@@ -10,7 +10,8 @@ import os
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
-# Static fallback explanations — written for pet owners, not bioinformaticians
+# Static fallback explanations — written for pet owners, not bioinformaticians.
+# Each key maps to a pipeline step name sent over the WebSocket.
 FALLBACK_EXPLANATIONS: dict[str, str] = {
     "load_dataset": (
         "We loaded the tumor mutation data and found 4,741 mutations in total. "
@@ -51,6 +52,19 @@ FALLBACK_EXPLANATIONS: dict[str, str] = {
         "We packaged everything into a downloadable report that you can share with your "
         "veterinarian. It includes the mutation summary, the ranked vaccine targets with "
         "explanations, the vaccine blueprint, and an important limitations section."
+    ),
+    "mhcflurry": (
+        "We predicted how strongly each vaccine target sticks to the immune system's "
+        "receptors using MHCflurry, a Python-based prediction engine. This works without "
+        "Docker and produces results in seconds instead of hours. The predictions are "
+        "very similar in quality to full pVACseq for the most common HLA allele types."
+    ),
+    "alphafold": (
+        "We looked up protein structure data from the AlphaFold database — a comprehensive "
+        "library of predicted 3D protein shapes built by DeepMind. For targets where "
+        "AlphaFold data is available, the structure confidence score (pLDDT) is "
+        "particularly reliable because it comes from full-length protein predictions "
+        "rather than short peptide sequences alone."
     ),
 }
 
@@ -106,8 +120,21 @@ async def _call_claude(step: str, context: dict) -> str:
             "Explain what the protein structure check tells us about whether the immune "
             "system can physically reach each vaccine target. Use an everyday analogy. "
             f"Structure sources used: {context.get('source_counts', {})}. "
-            "If AlphaFold data was available, mention that we used precomputed structures "
-            "from a world-leading protein database."
+            "If AlphaFold data was used, mention that we drew on precomputed structures "
+            "from a world-leading protein database. If only heuristic estimates were used, "
+            "explain that composition-based estimates are a reasonable starting point."
+        ),
+        "mhcflurry": (
+            f"Explain MHCflurry binding prediction step. "
+            f"We tested {context.get('total_evaluated', 'many')} candidates and found "
+            f"{context.get('passing_threshold', 'several')} that met the binding threshold. "
+            "Mention this is a Python-native predictor — no Docker required — "
+            "and that it gives results very similar to clinical tools like pVACseq."
+        ),
+        "alphafold": (
+            "Explain what the AlphaFold database is and why using precomputed structures "
+            "for known cancer genes is more reliable than folding short peptide sequences. "
+            "Use an everyday analogy like looking up a known map vs drawing one from scratch."
         ),
         "mrna_design": (
             f"Explain the vaccine blueprint design step. "
@@ -145,6 +172,24 @@ def _generic_fallback(step: str) -> str:
 # ---------------------------------------------------------------------------
 
 ON_DEMAND_PROMPT_TEMPLATES: dict[str, str] = {
+    "explain_structure_source": (
+        "Explain to a pet owner what it means that the structure prediction for "
+        "{gene} came from '{structure_source}'. "
+        "AlphaFold = precomputed from whole protein; ESMFold = live AI folding of peptide; "
+        "heuristic = composition estimate. Explain what this means for confidence. 2-3 sentences."
+    ),
+    "explain_ic50_source": (
+        "Explain to a pet owner what it means that the binding prediction for "
+        "{gene} {mutation} used '{ic50_source}' as the prediction engine. "
+        "pvacseq = clinical Docker pipeline; mhcflurry = Python AI tool; fixture = benchmark data. "
+        "Keep it reassuring and clear. 2-3 sentences."
+    ),
+    "explain_priority_score": (
+        "Explain to a pet owner what the priority score of {priority_score} means for "
+        "{gene} {mutation}. A score of 100 = perfect on all criteria; typical good targets "
+        "score 40-80. Explain the four factors (binding, expression, tumor presence, specificity) "
+        "in simple terms. 2-4 sentences."
+    ),
     "how_immune_binding_works": (
         "Explain to a pet owner (no biology background) how immune binding works for this "
         "neoantigen target. The peptide {mt_epitope_seq} binds to {hla_allele} with an IC50 of "
@@ -170,6 +215,28 @@ ON_DEMAND_PROMPT_TEMPLATES: dict[str, str] = {
 }
 
 ON_DEMAND_FALLBACKS: dict[str, str] = {
+    "explain_structure_source": (
+        "The structure prediction source tells us how confident we can be in the "
+        "3D shape data. AlphaFold uses a full-length protein model — the gold standard. "
+        "ESMFold folds the short peptide directly using AI. A heuristic estimate uses "
+        "amino acid composition as a quick approximation. All three are useful; AlphaFold "
+        "is simply the most thoroughly validated."
+    ),
+    "explain_ic50_source": (
+        "The prediction engine tells you how the binding strength (IC50) number was calculated. "
+        "pVACseq uses the same clinical pipeline used in human cancer vaccine research. "
+        "MHCflurry is a fast Python AI tool that produces very similar results without Docker. "
+        "Fixture values come from a published benchmark dataset. All three use scientifically "
+        "validated models — the key number to focus on is the IC50 value itself."
+    ),
+    "explain_priority_score": (
+        "The priority score combines four things we look for in a good vaccine target: "
+        "how tightly it binds to the immune system (binding strength), how actively "
+        "the tumor makes it (gene expression), how widespread it is across tumor cells "
+        "(tumor presence / VAF), and how different it is from normal proteins (specificity). "
+        "Higher is better, and a score above 50 suggests a strong candidate worth discussing "
+        "with your veterinarian."
+    ),
     "how_immune_binding_works": (
         "Your immune system uses special receptor proteins (called HLA) that work like locks. "
         "The peptide from this mutation fits into the lock tightly - the lower the IC50 number, "
