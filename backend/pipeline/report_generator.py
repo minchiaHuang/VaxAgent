@@ -1,7 +1,7 @@
 """PDF report generator for a completed VaxAgent pipeline run.
 
-Produces a concise research brief suitable for sharing with mixed
-technical and non-technical oncology research stakeholders.
+Produces a vaccine exploration report suitable for pet owners to share
+with their veterinary oncologist.
 Uses reportlab for PDF generation; outputs to a temp file.
 """
 
@@ -34,13 +34,23 @@ TEAL = colors.HexColor("#204b57")
 LIGHT_BG = colors.HexColor("#f7f3ea")
 
 
+def _binding_label(ic50: float) -> str:
+    if ic50 < 50:
+        return "Very strong"
+    if ic50 < 150:
+        return "Strong"
+    if ic50 < 500:
+        return "Moderate"
+    return "Weak"
+
+
 def generate_pdf(
     run_id: str,
     variant_stats: dict,
     candidates: list[dict],
     blueprint: dict,
 ) -> str:
-    """Generate a PDF research brief and return its file path."""
+    """Generate a PDF vaccine exploration report and return its file path."""
     output_path = str(REPORTS_DIR / f"vaxagent-{run_id}.pdf")
 
     doc = SimpleDocTemplate(
@@ -87,98 +97,126 @@ def generate_pdf(
     story = []
 
     # Title block
-    story.append(Paragraph("VaxAgent Research Brief", title_style))
+    story.append(Paragraph("VaxAgent — Vaccine Exploration Report", title_style))
     story.append(
         Paragraph(
-            f"Run ID: {run_id} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"Report ID: {run_id} &nbsp;&nbsp;|&nbsp;&nbsp; "
             f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
             small_style,
         )
     )
     story.append(
         Paragraph(
-            "<i>Research-use prototype. Not a clinical product or treatment recommendation.</i>",
+            "<i>For educational exploration only. Not a clinical product or treatment recommendation.</i>",
             small_style,
         )
     )
     story.append(HRFlowable(width="100%", thickness=1, color=ACCENT, spaceAfter=12))
 
-    # Dataset summary
-    story.append(Paragraph("1. Dataset Summary", h2_style))
+    # 1. Tumor profile
+    story.append(Paragraph("1. Tumor Profile", h2_style))
     ds = variant_stats
-    story.append(Paragraph(f"<b>Dataset:</b> {ds.get('dataset_name', '')}", body_style))
+    story.append(Paragraph(f"<b>Case:</b> {ds.get('dataset_name', '')}", body_style))
     story.append(Paragraph(f"<b>Tumor type:</b> {ds.get('tumor_type', '')}", body_style))
     story.append(Paragraph(f"<b>Source:</b> {ds.get('source', '')}", body_style))
-    story.append(Paragraph(f"<b>HLA alleles:</b> {', '.join(ds.get('hla_alleles', []))}", body_style))
+    story.append(Paragraph(f"<b>Immune receptors (HLA):</b> {', '.join(ds.get('hla_alleles', []))}", body_style))
 
     stats = ds.get("stats", {})
     stat_rows = [
         ["Metric", "Value"],
-        ["Total variants", str(stats.get("total_variants", ""))],
-        ["Somatic SNVs", str(stats.get("somatic_snvs", ""))],
-        ["Missense mutations", str(stats.get("missense_mutations", ""))],
-        ["Initial predictions", str(stats.get("initial_predictions", ""))],
-        ["High-confidence candidates", str(stats.get("high_confidence_candidates", ""))],
-        ["Shortlisted", str(stats.get("shortlisted_candidates", ""))],
+        ["Total mutations found", str(stats.get("total_variants", ""))],
+        ["Protein-changing mutations", str(stats.get("missense_mutations", ""))],
+        ["Candidates screened", str(stats.get("initial_predictions", ""))],
+        ["Top targets selected", str(stats.get("shortlisted_candidates", ""))],
     ]
     story.append(_make_table(stat_rows))
 
-    # Candidate ranking
-    story.append(Paragraph("2. Ranked Neoantigen Candidates", h2_style))
+    # 2. Vaccine targets
+    story.append(Paragraph("2. Top Vaccine Targets", h2_style))
     story.append(
         Paragraph(
-            "Candidates were ranked by a composite score weighting predicted binding affinity (IC50), "
-            "tumor expression (TPM), variant allele frequency, and fold-change specificity.",
+            "Targets were ranked by combining how tightly the immune system can grab them, "
+            "how actively the tumor produces them, how common they are across tumor cells, "
+            "and how different they are from normal proteins.",
             body_style,
         )
     )
 
-    cand_rows = [["#", "Gene", "Mutation", "Peptide", "HLA", "IC50 (nM)", "Expr (TPM)", "VAF", "Score"]]
+    cand_rows = [["#", "Gene", "Mutation", "Binding", "Tumor Presence", "Score"]]
     for c in candidates:
+        vaf = c.get("tumor_dna_vaf", 0)
         cand_rows.append([
             str(c.get("rank", "")),
             c.get("gene", ""),
             c.get("mutation", ""),
-            c.get("mt_epitope_seq", ""),
-            c.get("hla_allele", "").replace("HLA-", ""),
-            str(c.get("ic50_mt", "")),
-            str(c.get("gene_expression_tpm", "")),
-            f"{c.get('tumor_dna_vaf', 0):.0%}",
+            _binding_label(c.get("ic50_mt", 999)),
+            f"In {vaf:.0%} of cells",
             str(c.get("priority_score", "")),
         ])
     story.append(_make_table(cand_rows, header_color=TEAL))
 
-    # Explanations for top 3
-    story.append(Paragraph("3. Candidate Rationale", h2_style))
+    # 3. Why these targets
+    story.append(Paragraph("3. Why These Targets Were Selected", h2_style))
     for c in candidates[:3]:
+        binding = _binding_label(c.get("ic50_mt", 999))
+        vaf_pct = f"{c.get('tumor_dna_vaf', 0):.0%}"
+        clonality = "all tumor cells" if c.get("clonality") == "clonal" else "some tumor cells"
+        explanation = c.get("explanation", "")
+        if not explanation:
+            explanation = (
+                f"This mutation in the {c['gene']} gene creates a protein fragment with "
+                f"{binding.lower()} immune binding, found in {vaf_pct} of tumor cells "
+                f"({clonality}). The immune system can learn to recognize this altered "
+                f"protein and target cells carrying it."
+            )
         story.append(
             Paragraph(
-                f"<b>#{c['rank']} {c['gene']} {c['mutation']}</b> — {c.get('explanation', 'No explanation generated.')}",
+                f"<b>#{c['rank']} {c['gene']} {c['mutation']}</b> — {explanation}",
                 body_style,
             )
         )
         story.append(Spacer(1, 4))
 
-    # Blueprint
-    story.append(Paragraph("4. Draft mRNA Construct Blueprint", h2_style))
+    # 4. Vaccine blueprint
+    story.append(Paragraph("4. Vaccine Blueprint Summary", h2_style))
     bp = blueprint
-    story.append(Paragraph(f"<b>Construct ID:</b> {bp.get('construct_id', '')}", body_style))
+    story.append(Paragraph(f"<b>Design ID:</b> {bp.get('construct_id', '')}", body_style))
     story.append(Paragraph(f"<b>Strategy:</b> {bp.get('strategy', '')}", body_style))
-    story.append(Paragraph(f"<b>Total length:</b> {bp.get('total_length_nt', 0)} nt", body_style))
-    story.append(Paragraph(f"<b>Payload:</b> {bp.get('payload_summary', '')}", body_style))
+    story.append(Paragraph(f"<b>Total length:</b> {bp.get('total_length_nt', 0)} nucleotides", body_style))
+    story.append(
+        Paragraph(
+            "This blueprint assembles the top vaccine targets into a single construct "
+            "that could teach the immune system to recognize multiple tumor mutations at once. "
+            "It is a research starting point — not a ready-to-manufacture design.",
+            body_style,
+        )
+    )
     story.append(Spacer(1, 6))
     for note in bp.get("notes", []):
         story.append(Paragraph(f"• {note}", small_style))
 
-    # Limitations
-    story.append(Paragraph("5. Limitations and Guardrails", h2_style))
+    # 5. Discussing with your veterinarian
+    story.append(Paragraph("5. Discussing This With Your Veterinarian", h2_style))
+    vet_points = [
+        "Bring this report to your next veterinary oncology appointment.",
+        "Ask whether a personalized vaccine approach could be appropriate for your pet's case.",
+        "Discuss which synthesis providers your vet would recommend working with.",
+        "Confirm whether your pet's overall health supports immunotherapy.",
+        "Ask about any ongoing clinical trials for cancer immunotherapy in animals.",
+        "Remember that all targets in this report are computational predictions that require lab validation.",
+    ]
+    for point in vet_points:
+        story.append(Paragraph(f"• {point}", body_style))
+
+    # 6. Limitations
+    story.append(Paragraph("6. Important Limitations", h2_style))
     limitations = [
-        "This output is a research prototype for demonstration purposes only.",
-        "Candidate ranking is based on computational predictions; experimental validation is required.",
-        "The mRNA construct preview is not optimized for therapeutic manufacturability.",
-        "Less than 5% of computationally predicted neoantigens trigger a clinical immune response.",
-        "No clinical recommendation or treatment guidance is implied.",
-        "Human expert review is required before any downstream scientific use.",
+        "This tool provides computational predictions only — it is not a diagnosis or treatment plan.",
+        "All vaccine targets are predictions based on algorithms. They require wet-lab validation.",
+        "Fewer than 5% of computationally predicted targets may prove effective in practice.",
+        "The vaccine blueprint is a research preview, not a validated therapeutic design.",
+        "A qualified veterinary oncologist must review any treatment decisions.",
+        "This tool is for educational exploration, not clinical use.",
     ]
     for lim in limitations:
         story.append(Paragraph(f"• {lim}", small_style))
