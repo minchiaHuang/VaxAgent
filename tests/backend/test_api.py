@@ -6,6 +6,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def test_benchmarks_endpoint_discovers_datasets(client: TestClient) -> None:
+    response = client.get("/api/benchmarks")
+
+    assert response.status_code == 200
+    benchmarks = response.json()["benchmarks"]
+    ids = [b["id"] for b in benchmarks]
+    assert "hcc1395" in ids
+    assert "canine-mammary" in ids
+
+    canine = next(b for b in benchmarks if b["id"] == "canine-mammary")
+    assert canine["species"] == "canine"
+    assert canine["cancer_type"] == "Mammary carcinoma"
+    assert canine["total_variants"] > 0
+
+    human = next(b for b in benchmarks if b["id"] == "hcc1395")
+    assert human["total_variants"] > 0
+
+
 def test_health_returns_service_metadata(client: TestClient) -> None:
     response = client.get("/health")
 

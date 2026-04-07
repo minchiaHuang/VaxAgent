@@ -266,6 +266,8 @@ const elements = {
   hlaAllelesInput: document.getElementById("hla-alleles-input"),
   analyseButton: document.getElementById("analyse-button"),
   tryDemoButton: document.getElementById("try-demo"),
+  benchmarkSelector: document.getElementById("benchmark-selector"),
+  benchmarkList: document.getElementById("benchmark-list"),
   pipelineProgress: document.getElementById("pipeline-progress"),
   pipelineStatus: document.getElementById("pipeline-status"),
   progressBar: document.getElementById("progress-bar"),
@@ -1953,7 +1955,48 @@ async function uploadAndRun() {
   elements.analyseButton.textContent = "Analyse My File";
 }
 
-async function loadDemo() {
+/* ── Benchmark selector ─────────────────────────────────────────────── */
+
+let _benchmarksCache = null;
+
+async function fetchBenchmarks() {
+  if (_benchmarksCache) return _benchmarksCache;
+  try {
+    const res = await fetch(`${API_ORIGIN}/api/benchmarks`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    _benchmarksCache = data.benchmarks || [];
+    return _benchmarksCache;
+  } catch {
+    return null;
+  }
+}
+
+function renderBenchmarkSelector(benchmarks) {
+  if (!elements.benchmarkList || !benchmarks || benchmarks.length === 0) return;
+
+  const speciesIcon = { canine: "\u{1F415}", human: "\u{1F9EC}", feline: "\u{1F408}" };
+
+  elements.benchmarkList.innerHTML = benchmarks.map(b => `
+    <button class="benchmark-card" data-benchmark-id="${b.id}">
+      <span class="benchmark-icon">${speciesIcon[b.species] || "\u{1F9EC}"}</span>
+      <div class="benchmark-info">
+        <strong>${b.dataset_name}</strong>
+        <span class="benchmark-meta">
+          ${b.species === "canine" ? "Dog" : b.species === "feline" ? "Cat" : "Human"}
+          &middot; ${b.cancer_type}
+          &middot; ${(b.missense_mutations || 0).toLocaleString()} missense mutations
+        </span>
+      </div>
+    </button>
+  `).join("");
+
+  elements.benchmarkList.querySelectorAll(".benchmark-card").forEach(card => {
+    card.addEventListener("click", () => loadBenchmark(card.dataset.benchmarkId));
+  });
+}
+
+async function loadBenchmark(datasetId) {
   if (state.loading) return;
   resetRunState();
   state.loading = true;
@@ -1962,14 +2005,31 @@ async function loadDemo() {
   showPipelineProgress(true);
   elements.pipelineStatus.textContent = "Trying to connect to the analysis backend...";
 
-  const ok = await runBackendPipelineWithUrl(WS_URL);
+  const wsUrl = `${WS_URL}?dataset_id=${encodeURIComponent(datasetId)}&species=${encodeURIComponent(state.species || "")}&cancer_type=${encodeURIComponent(state.cancerType || "")}`;
+  const ok = await runBackendPipelineWithUrl(wsUrl);
   if (!ok) {
     applyFallbackRun();
     setUploadStatus("Loaded demo case (offline mode).");
   } else {
-    setUploadStatus("Demo analysis complete.");
+    setUploadStatus("Benchmark analysis complete.");
   }
   state.loading = false;
+}
+
+async function loadDemo() {
+  if (state.loading) return;
+
+  // Try to show benchmark selector if backend has multiple benchmarks
+  const benchmarks = await fetchBenchmarks();
+  if (benchmarks && benchmarks.length > 1 && elements.benchmarkSelector) {
+    renderBenchmarkSelector(benchmarks);
+    elements.benchmarkSelector.hidden = false;
+    return;
+  }
+
+  // Single benchmark or no backend — load directly
+  const datasetId = (benchmarks && benchmarks.length > 0) ? benchmarks[0].id : "hcc1395";
+  await loadBenchmark(datasetId);
 }
 
 /* ── Export ───────────────────────────────────────────────────────────── */

@@ -24,10 +24,15 @@ VEP_TIMEOUT = int(os.getenv("VEP_TIMEOUT", "7200"))  # 2 hours default
 
 
 def load_candidates_fixture(dataset_id: str = "hcc1395") -> list[dict]:
-    path = BENCHMARKS_DIR / dataset_id / "pvacseq_candidates.json"
-    with open(path) as f:
-        data = json.load(f)
-    return data.get("candidates", [])
+    benchmark_dir = BENCHMARKS_DIR / dataset_id
+    # Support both naming conventions
+    for name in ("pvacseq_candidates.json", "candidates.json"):
+        path = benchmark_dir / name
+        if path.exists():
+            with open(path) as f:
+                data = json.load(f)
+            return data.get("candidates", [])
+    raise FileNotFoundError(f"No candidates fixture found in {benchmark_dir}")
 
 
 def run_pvacseq(

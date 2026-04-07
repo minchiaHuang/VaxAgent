@@ -191,3 +191,44 @@ def test_pipeline_uses_completed_job_candidates(app_env) -> None:
 
     assert pvacseq_complete["data"]["candidate_count"] == 1
     assert ranking_complete["data"]["candidates"][0]["gene"] == "TP53"
+
+
+def test_pipeline_loads_canine_benchmark(app_env) -> None:
+    """Canine mammary benchmark dataset loads and pipeline completes."""
+    async def fake_explain(step: str, _context: dict) -> str:
+        return f"{step} explained"
+
+    async def fake_enrich(candidates: list[dict]) -> list[dict]:
+        for candidate in candidates:
+            candidate.setdefault("plddt", 70.0)
+            candidate.setdefault("surface_accessible", True)
+        return candidates
+
+    def fake_generate_pdf(run_id: str, _vs: dict, _cands: list[dict], _bp: dict) -> str:
+        report_path = app_env.reports_dir / f"{run_id}.pdf"
+        report_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+        return str(report_path)
+
+    app_env.main.explain_step = fake_explain
+    app_env.main.enrich_candidates_with_structure = fake_enrich
+    app_env.main.generate_pdf = fake_generate_pdf
+
+    with TestClient(app_env.main.app) as client:
+        with client.websocket_connect("/ws/pipeline?dataset_id=canine-mammary") as ws:
+            messages = _collect_messages(ws)
+
+    steps = [m["step"] for m in messages]
+    assert "pipeline_complete" in steps
+
+    load_complete = next(
+        m for m in messages
+        if m["step"] == "load_dataset" and m["status"] == "complete"
+    )
+    assert load_complete["data"]["dataset_id"] == "canine-mammary"
+    assert load_complete["data"]["species"] == "canine"
+
+    ranking_complete = next(
+        m for m in messages
+        if m["step"] == "ranking" and m["status"] == "complete"
+    )
+    assert len(ranking_complete["data"]["candidates"]) > 0

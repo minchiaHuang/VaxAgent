@@ -612,6 +612,65 @@ h3 {
   font-size: 0.88rem;
 }
 
+.benchmark-selector {
+  margin-top: 16px;
+}
+
+.benchmark-selector-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 10px;
+}
+
+.benchmark-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.benchmark-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-component);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.benchmark-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.benchmark-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.benchmark-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.benchmark-info strong {
+  font-size: 0.95rem;
+  color: var(--heading);
+}
+
+.benchmark-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .pipeline-progress {
   margin-top: 16px;
   padding: 18px;

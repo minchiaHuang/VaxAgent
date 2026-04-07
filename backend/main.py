@@ -127,6 +127,32 @@ async def health() -> dict:
     }
 
 
+BENCHMARKS_DIR = Path(__file__).parent.parent / "data" / "benchmarks"
+
+
+@app.get("/api/benchmarks")
+async def get_benchmarks() -> JSONResponse:
+    """Discover available benchmark datasets by scanning data/benchmarks/."""
+    benchmarks = []
+    if BENCHMARKS_DIR.is_dir():
+        for d in sorted(BENCHMARKS_DIR.iterdir()):
+            stats_path = d / "variant_stats.json"
+            if stats_path.exists():
+                with open(stats_path) as f:
+                    stats = json.load(f)
+                benchmarks.append({
+                    "id": d.name,
+                    "dataset_name": stats.get("dataset_name", d.name),
+                    "species": stats.get("species", "human"),
+                    "cancer_type": stats.get("tumor_type", "Unknown"),
+                    "source": stats.get("source", ""),
+                    "total_variants": stats.get("stats", {}).get("total_variants", 0),
+                    "missense_mutations": stats.get("stats", {}).get("missense_mutations", 0),
+                    "shortlisted_candidates": stats.get("stats", {}).get("shortlisted_candidates", 0),
+                })
+    return JSONResponse({"benchmarks": benchmarks})
+
+
 @app.get("/api/runs")
 async def get_runs() -> JSONResponse:
     runs = await list_runs()
@@ -342,6 +368,8 @@ async def pipeline_ws(
     dataset_id: str = "hcc1395",
     file_id: str = "",
     job_id: str = "",
+    species: str = "",
+    cancer_type: str = "",
 ) -> None:
     await websocket.accept()
     run_id = uuid.uuid4().hex[:8]
@@ -508,6 +536,8 @@ async def pipeline_ws(
             "top_candidate": f"{top.get('gene', '')} {top.get('mutation', '')}",
             "candidate_count": len(ranked),
             "construct_id": blueprint.get("construct_id", ""),
+            "species": species,
+            "cancer_type": cancer_type,
         }
         payload = {
             "variant_stats": variant_stats,
