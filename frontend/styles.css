@@ -2080,6 +2080,110 @@ h3 {
   display: block;
 }
 
+/* ── Audience toggle ────────────────────────────────────────────────── */
+
+.audience-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-subtle);
+  border-radius: 6px;
+  padding: 2px;
+}
+.audience-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.audience-btn.is-active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ── Inline context ────────────────────────────────────────────────── */
+
+.inline-context {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 8px 0 12px;
+  padding: 10px 14px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-component);
+  border-left: 3px solid var(--primary);
+}
+
+/* ── Origin badge ──────────────────────────────────────────────────── */
+
+.origin-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.origin-badge.is-benchmark {
+  background: #fef3c7;
+  color: #92400e;
+}
+.origin-badge.is-uploaded {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* ── Scoring breakdown bars ────────────────────────────────────────── */
+
+.scoring-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.score-factor {
+  display: grid;
+  grid-template-columns: 120px 1fr 70px;
+  align-items: center;
+  gap: 8px;
+}
+.factor-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.factor-track {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.factor-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.factor-rating {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: right;
+}
+
+/* ── Ranking explainer ─────────────────────────────────────────────── */
+
+.ranking-explainer {
+  margin-bottom: 16px;
+}
+
 /* ── Mobile breakpoint: static fallbacks ───────────────────────────────── */
 
 @media (max-width: 768px) {

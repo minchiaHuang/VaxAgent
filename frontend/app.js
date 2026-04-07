@@ -209,6 +209,7 @@ const state = {
   // Wizard
   wizardStep: 1,
   maxUnlockedStep: 1,
+  audience: "pet_owner",
   diagnosis: { species: "", cancerType: "", cancerTypeCustom: "", stage: "", treatmentHistory: "" },
 
   // Pipeline data
@@ -622,6 +623,39 @@ function buildCandidateNarrative(candidate) {
   };
 }
 
+function scoringBars(c) {
+  const bindingPct = Math.max(0, Math.min(100, (1 - c.ic50_mt / 500) * 100));
+  const presencePct = Math.min(100, (c.tumor_dna_vaf || 0) * 200);
+  const activityPct = Math.min(100, (c.gene_expression_tpm || 0) / 50 * 100);
+  const specificityPct = Math.min(100, Math.log10(Math.max(1, c.fold_change || 1)) / Math.log10(500) * 100);
+
+  const label = (pct) => pct > 75 ? 'Excellent' : pct > 50 ? 'Strong' : pct > 25 ? 'Moderate' : 'Low';
+
+  return `
+    <div class="scoring-bars">
+      <div class="score-factor">
+        <span class="factor-label">Binding strength</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${bindingPct}%"></div></div>
+        <span class="factor-rating">${label(bindingPct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Tumor presence</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${presencePct}%"></div></div>
+        <span class="factor-rating">${label(presencePct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Gene activity</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${activityPct}%"></div></div>
+        <span class="factor-rating">${label(activityPct)}</span>
+      </div>
+      <div class="score-factor">
+        <span class="factor-label">Immune specificity</span>
+        <div class="factor-track"><div class="factor-fill" style="width:${specificityPct}%"></div></div>
+        <span class="factor-rating">${label(specificityPct)}</span>
+      </div>
+    </div>`;
+}
+
 function renderCandidates() {
   if (!state.candidates.length) {
     elements.candidateList.className = "candidate-list empty-state";
@@ -648,9 +682,14 @@ function renderCandidates() {
     `).join("");
   }
 
-  // Candidate cards
+  // Show ranking explainer
+  document.getElementById('ranking-explainer')?.removeAttribute('hidden');
+
+  // Origin badge + Candidate cards
+  const isDemo = state.mode === "fallback";
   elements.candidateList.className = "candidate-list";
-  elements.candidateList.innerHTML = state.candidates.map((c) => {
+  const originBadge = `<div class="origin-badge ${isDemo ? 'is-benchmark' : 'is-uploaded'}">${isDemo ? 'Benchmark data' : 'From your file'}</div>`;
+  elements.candidateList.innerHTML = originBadge + state.candidates.map((c) => {
     const selected = c.rank === state.selectedCandidateRank ? "is-selected" : "";
     const binding = bindingLabel(c.ic50_mt);
     const narrative = buildCandidateNarrative(c);
@@ -672,6 +711,7 @@ function renderCandidates() {
             <div class="candidate-detail">
               <p>${narrative.summary}</p>
               <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
+              ${scoringBars(c)}
               <div class="guardrail">${narrative.caution}</div>
               <div class="candidate-explain-row">
                 <button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_priority_score" type="button">Why this score?</button>
@@ -1724,6 +1764,10 @@ function applyPipelineMessage(message) {
   if (message.step && state.stepStatuses[message.step] !== undefined) {
     state.stepStatuses[message.step] = message.status;
   }
+  // Show prediction context when pvacseq starts
+  if (message.step === "pvacseq" && message.status === "running") {
+    document.getElementById('prediction-context')?.removeAttribute('hidden');
+  }
   if (message.explanation) {
     state.stepExplanations[message.step] = message.explanation;
   }
@@ -2240,6 +2284,15 @@ function restorePendingFullAnalysis() {
 }
 
 /* ── Event wiring ────────────────────────────────────────────────────── */
+
+// Audience toggle
+document.querySelectorAll('.audience-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.audience-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    state.audience = btn.dataset.audience;
+  });
+});
 
 // Wizard navigation
 elements.wizardBack.addEventListener("click", () => goToStep(state.wizardStep - 1));

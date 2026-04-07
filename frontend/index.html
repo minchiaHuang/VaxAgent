@@ -20,6 +20,11 @@
           <p class="wizard-subtitle">Your guide to exploring a personalized cancer vaccine</p>
         </div>
         <div class="wizard-header-right">
+          <div id="audience-toggle" class="audience-toggle">
+            <button class="audience-btn is-active" data-audience="pet_owner">Pet Owner</button>
+            <button class="audience-btn" data-audience="veterinarian">Vet</button>
+            <button class="audience-btn" data-audience="researcher">Researcher</button>
+          </div>
           <span class="notice-chip">For educational exploration only</span>
           <span id="mode-chip" class="mode-chip">Awaiting</span>
         </div>
@@ -78,6 +83,7 @@
                 <span class="species-name">Other</span>
               </button>
             </div>
+            <p class="inline-context">Species determines which immune system we model. Dogs use DLA alleles, humans use HLA — these are the "locks" that determine which protein fragments the immune system can detect.</p>
           </div>
 
           <div class="form-group">
@@ -177,8 +183,8 @@
               class="form-input"
               placeholder="e.g. DLA-88*001:01 — your sequencing lab can provide this"
             />
-            <p class="form-hint">
-              These alleles describe your pet's specific immune receptors. If you don't have them, the analysis will use a reference set.
+            <p class="form-hint" id="allele-hint">
+              Your pet's immune alleles (DLA for dogs) are like a fingerprint for their immune system. Each animal has a unique combination. If you don't have your pet's allele type, ask your vet about DLA typing — it's a simple blood test.
             </p>
           </div>
 
@@ -212,6 +218,10 @@
             <p id="job-progress-note" class="job-progress-note">
               This may take 30–60 minutes for a full analysis. You can leave this page open and return later.
             </p>
+          </div>
+
+          <div id="prediction-context" class="inline-context" hidden>
+            <strong>What's happening:</strong> Each mutated protein is chopped into small fragments (9 amino acids long). We test whether each fragment fits tightly into your pet's immune receptor — like testing which keys fit a lock. Fragments that bind tightly become vaccine target candidates.
           </div>
 
           <p id="upload-status" class="upload-status"></p>
@@ -364,6 +374,10 @@
             <div id="summary-grid" class="summary-grid"></div>
           </div>
 
+          <div id="ranking-explainer" class="ranking-explainer" hidden>
+            <p class="inline-context"><strong>How we rank targets:</strong> We combine four factors — binding strength (can the immune system grab it?), tumor presence (is it common across the tumor?), gene activity (is the tumor making it?), and immune specificity (how different from normal proteins?). A good vaccine target scores well on all four.</p>
+          </div>
+
           <div id="candidate-list" class="candidate-list empty-state">
             Upload your data or try the demo to see vaccine targets.
           </div>
@@ -394,6 +408,7 @@
             <p class="section-kicker">Step 4</p>
             <h2>Your vaccine blueprint</h2>
             <p class="step-intro">A summary of what could be synthesized based on the top vaccine targets identified in your pet's tumor.</p>
+            <p class="inline-context">This follows the same basic design as modern mRNA vaccines (like COVID-19 vaccines), adapted for cancer targets. Each part of the molecule has a specific job — from protecting the mRNA to directing the immune response.</p>
           </div>
 
           <div id="blueprint-card" class="blueprint-card empty-state">
@@ -423,6 +438,8 @@
             <h2>What to do next</h2>
             <p class="step-intro">Now that you have vaccine targets identified, here's how to move forward.</p>
           </div>
+
+          <p class="inline-context">This report summarizes your complete analysis. Share it with your veterinarian to discuss next steps. It includes the mutation summary, ranked targets with explanations, the vaccine blueprint, and important limitations.</p>
 
           <div class="nextsteps-grid">
             <article class="nextstep-card">
