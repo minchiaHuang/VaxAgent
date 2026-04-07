@@ -465,18 +465,28 @@ async def pipeline_ws(
             run_id=run_id,
         )
 
-        # ── Step 4: ESMFold structure enrichment ─────────────────────────
+        # ── Step 4: Tiered structure prediction ──────────────────────────
         await _send(websocket, "esmfold", "running", run_id=run_id)
         await _step_sleep(0.3)
 
         enriched = await enrich_candidates_with_structure(ranked[:5])
-        explanation = await explain_step("esmfold", {})
+
+        # Summarise which prediction tiers were used for the explanation.
+        source_counts: dict[str, int] = {}
+        for c in enriched:
+            src = c.get("structure_source", "heuristic")
+            source_counts[src] = source_counts.get(src, 0) + 1
+
+        explanation = await explain_step("esmfold", {"source_counts": source_counts})
         await _send(
             websocket,
             "esmfold",
             "complete",
             explanation=explanation,
-            data={"enriched_count": len(enriched)},
+            data={
+                "enriched_count": len(enriched),
+                "source_counts": source_counts,
+            },
             run_id=run_id,
         )
 
@@ -486,7 +496,7 @@ async def pipeline_ws(
             if c["rank"] in enriched_map:
                 c.update({
                     k: v for k, v in enriched_map[c["rank"]].items()
-                    if k in ("plddt", "surface_accessible")
+                    if k in ("plddt", "surface_accessible", "structure_source")
                 })
 
         # ── Step 5: mRNA construct design ────────────────────────────────
