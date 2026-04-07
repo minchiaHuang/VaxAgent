@@ -12,6 +12,40 @@
   --accent-2-soft: rgba(32, 75, 87, 0.12);
   --success: #23543a;
   --shadow: 0 18px 50px rgba(50, 38, 20, 0.12);
+
+  /* Visual Explorer design tokens (forward-compatible with design-refresh) */
+  --ve-bg: #f8fafc;
+  --ve-bg-subtle: #f1f5f9;
+  --ve-panel: #ffffff;
+  --ve-ink: #0f172a;
+  --ve-body: #334155;
+  --ve-muted: #94a3b8;
+  --ve-line: #e2e8f0;
+  --ve-primary: #0f766e;
+  --ve-primary-hover: #0d9488;
+  --ve-primary-soft: #ccfbf1;
+  --ve-info: #0369a1;
+  --ve-info-soft: #e0f2fe;
+  --ve-danger: #b91c1c;
+  --ve-danger-soft: #fee2e2;
+  --ve-success: #15803d;
+  --ve-success-soft: #dcfce7;
+  --ve-amber: #a16207;
+  --ve-amber-soft: #fef3c7;
+  --ve-shadow-sm: 0 1px 2px rgba(15,23,42,0.05);
+  --ve-shadow: 0 4px 12px rgba(15,23,42,0.08);
+  --ve-shadow-lg: 0 12px 32px rgba(15,23,42,0.10);
+  --ve-radius-container: 16px;
+  --ve-radius-component: 12px;
+  --ve-radius-pill: 999px;
+  --ve-font-heading: 'DM Serif Display', Georgia, serif;
+  --ve-font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --ve-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  --ve-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ve-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ve-duration-micro: 150ms;
+  --ve-duration-normal: 250ms;
+  --ve-duration-scene: 400ms;
 }
 
 * {
@@ -828,5 +862,582 @@ h2 {
 
   .hla-input {
     min-width: unset;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   VISUAL EXPLORER — Scenes 3a, 3b, 4a
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Scene containers ──────────────────────────────────────────────────── */
+
+.scene-container {
+  display: none;
+}
+
+.scene-container.is-active {
+  display: block;
+}
+
+.scene-container .scene-heading {
+  margin: 0 0 18px;
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
+}
+
+.scene-container .scene-subheading {
+  margin: 0 0 24px;
+  color: var(--ve-body);
+  line-height: 1.55;
+}
+
+/* ── Funnel Visualization (Scene 3a) ───────────────────────────────────── */
+
+.funnel-scene {
+  text-align: center;
+}
+
+.funnel-svg-wrap {
+  max-width: 600px;
+  margin: 0 auto 24px;
+}
+
+.funnel-viz {
+  width: 100%;
+  height: auto;
+}
+
+.funnel-bar {
+  fill: var(--ve-primary-soft);
+  rx: 8;
+  ry: 8;
+}
+
+.funnel-bar[data-tier="4"] {
+  fill: var(--ve-primary);
+}
+
+.funnel-count {
+  fill: var(--ve-ink);
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--ve-font-body);
+  dominant-baseline: central;
+}
+
+.funnel-count[data-tier="4"] {
+  fill: #fff;
+}
+
+.funnel-label {
+  fill: var(--ve-muted);
+  font-size: 13px;
+  font-family: var(--ve-font-body);
+  dominant-baseline: central;
+}
+
+.funnel-connector {
+  stroke: var(--ve-line);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.funnel-explanation {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 18px 20px;
+  border-radius: var(--ve-radius-container);
+  background: var(--ve-bg-subtle);
+  color: var(--ve-body);
+  line-height: 1.6;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+/* ── Mobile funnel fallback ────────────────────────────────────────────── */
+
+.funnel-static {
+  display: none;
+}
+
+.funnel-static-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.funnel-static-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: var(--ve-radius-component);
+  border: 1px solid var(--ve-line);
+  background: var(--ve-panel);
+}
+
+.funnel-static-item:last-child {
+  background: var(--ve-primary-soft);
+  border-color: var(--ve-primary);
+}
+
+.funnel-static-item .stat-label {
+  color: var(--ve-body);
+  font-size: 0.9rem;
+}
+
+.funnel-static-item .stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ve-ink);
+}
+
+.funnel-static-item:last-child .stat-value {
+  color: var(--ve-primary);
+}
+
+/* ── Target Explorer (Scene 3b) ────────────────────────────────────────── */
+
+.explorer-scene {
+  /* full width layout */
+}
+
+.explorer-schematic {
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto 20px;
+  min-height: 340px;
+}
+
+.explorer-schematic svg {
+  width: 100%;
+  height: auto;
+}
+
+.protein-membrane {
+  fill: none;
+  stroke: var(--ve-line);
+  stroke-width: 2;
+}
+
+.protein-body {
+  fill: url(#proteinGradient);
+  stroke: var(--ve-muted);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.mutation-marker {
+  rx: 4;
+  ry: 4;
+  transition: opacity var(--ve-duration-micro) ease;
+}
+
+.mutation-marker.surface {
+  fill: var(--ve-success);
+  filter: url(#glowGreen);
+}
+
+.mutation-marker.buried {
+  fill: var(--ve-amber);
+  filter: url(#glowAmber);
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
+.mutation-marker {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.schematic-label {
+  fill: var(--ve-body);
+  font-size: 12px;
+  font-family: var(--ve-font-body);
+}
+
+.schematic-label-connector {
+  stroke: var(--ve-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  fill: none;
+}
+
+.surface-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--ve-radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.surface-badge.is-surface {
+  background: var(--ve-success-soft);
+  color: var(--ve-success);
+}
+
+.surface-badge.is-buried {
+  background: var(--ve-amber-soft);
+  color: var(--ve-amber);
+}
+
+/* ── Target selector tabs ──────────────────────────────────────────────── */
+
+.explorer-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  margin: 0 auto 20px;
+  max-width: 600px;
+  border-radius: var(--ve-radius-component);
+  background: var(--ve-bg-subtle);
+  overflow-x: auto;
+}
+
+.explorer-tab {
+  flex: 1;
+  min-width: 90px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ve-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--ve-duration-micro) ease, color var(--ve-duration-micro) ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.explorer-tab:hover {
+  background: var(--ve-panel);
+}
+
+.explorer-tab.is-selected {
+  background: var(--ve-primary);
+  color: #fff;
+}
+
+.explorer-tab .tab-rank {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.explorer-tab .tab-dots {
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+}
+
+/* ── Explanation panel (shared) ────────────────────────────────────────── */
+
+.ve-explanation-panel {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  border-radius: var(--ve-radius-container);
+  border: 1px solid var(--ve-line);
+  background: var(--ve-panel);
+  box-shadow: var(--ve-shadow-sm);
+}
+
+.ve-explanation-panel .panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ve-explanation-panel .panel-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ve-ink);
+}
+
+.ve-explanation-panel .panel-subtitle {
+  font-size: 0.82rem;
+  color: var(--ve-muted);
+}
+
+.ve-explanation-panel .panel-summary {
+  margin: 0 0 14px;
+  color: var(--ve-body);
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+.ve-accordion-item {
+  border-top: 1px solid var(--ve-line);
+}
+
+.ve-accordion-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  background: transparent;
+  color: var(--ve-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ve-accordion-trigger:hover {
+  color: var(--ve-primary-hover);
+}
+
+.ve-accordion-chevron {
+  font-size: 0.7rem;
+  transition: transform var(--ve-duration-micro) ease;
+}
+
+.ve-accordion-item.is-open .ve-accordion-chevron {
+  transform: rotate(90deg);
+}
+
+.ve-accordion-body {
+  display: none;
+  padding: 0 0 14px 22px;
+  color: var(--ve-body);
+  line-height: 1.6;
+  font-size: 0.88rem;
+}
+
+.ve-accordion-item.is-open .ve-accordion-body {
+  display: block;
+}
+
+/* Loading shimmer */
+.ve-shimmer {
+  display: grid;
+  gap: 8px;
+}
+
+.ve-shimmer-line {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--ve-bg-subtle) 25%, var(--ve-line) 50%, var(--ve-bg-subtle) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.ve-shimmer-line:nth-child(2) { width: 85%; }
+.ve-shimmer-line:nth-child(3) { width: 65%; }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.ve-error-msg {
+  color: var(--ve-danger);
+  font-size: 0.85rem;
+}
+
+.ve-retry-link {
+  color: var(--ve-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* ── Construct Assembly (Scene 4a) ─────────────────────────────────────── */
+
+.construct-scene {
+  text-align: center;
+}
+
+.construct-svg-wrap {
+  max-width: 900px;
+  margin: 0 auto 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.construct-viz {
+  width: 100%;
+  height: auto;
+  min-width: 700px;
+}
+
+.construct-segment {
+  cursor: pointer;
+  transition: filter var(--ve-duration-micro) ease;
+}
+
+.construct-segment:hover .segment-rect,
+.construct-segment.is-selected .segment-rect {
+  filter: brightness(0.92);
+  stroke-width: 2;
+}
+
+.segment-rect {
+  rx: 6;
+  ry: 6;
+  stroke-width: 1;
+}
+
+.segment-rect.type-cap,
+.segment-rect.type-utr,
+.segment-rect.type-polya,
+.segment-rect.type-stop {
+  fill: var(--ve-bg-subtle);
+  stroke: var(--ve-muted);
+}
+
+.segment-rect.type-signal {
+  fill: var(--ve-info-soft);
+  stroke: var(--ve-info);
+}
+
+.segment-rect.type-target {
+  fill: var(--ve-primary-soft);
+  stroke: var(--ve-primary);
+}
+
+.segment-rect.type-linker {
+  fill: none;
+  stroke: var(--ve-muted);
+  stroke-dasharray: 4 3;
+}
+
+.segment-label {
+  fill: var(--ve-ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--ve-font-body);
+  dominant-baseline: central;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.segment-label.type-linker {
+  fill: var(--ve-muted);
+  font-size: 9px;
+}
+
+.construct-explanation {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Mobile explorer fallback ──────────────────────────────────────────── */
+
+.explorer-static {
+  display: none;
+}
+
+.explorer-static-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.explorer-static-card {
+  padding: 16px 18px;
+  border-radius: var(--ve-radius-component);
+  border: 1px solid var(--ve-line);
+  background: var(--ve-panel);
+  text-align: left;
+  cursor: pointer;
+}
+
+.explorer-static-card.is-expanded {
+  background: var(--ve-primary-soft);
+  border-color: var(--ve-primary);
+}
+
+.explorer-static-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.explorer-static-card .card-gene {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ve-ink);
+}
+
+.explorer-static-card .card-rank {
+  color: var(--ve-primary);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.explorer-static-card .card-summary {
+  color: var(--ve-body);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.explorer-static-card .card-detail {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ve-line);
+  font-size: 0.84rem;
+  color: var(--ve-body);
+  line-height: 1.55;
+}
+
+.explorer-static-card.is-expanded .card-detail {
+  display: block;
+}
+
+/* ── Mobile breakpoint: static fallbacks ───────────────────────────────── */
+
+@media (max-width: 768px) {
+  .funnel-svg-wrap,
+  .explorer-schematic,
+  .explorer-tabs {
+    display: none;
+  }
+
+  .funnel-static,
+  .explorer-static {
+    display: block;
+  }
+
+  .construct-viz {
+    min-width: 500px;
+  }
+
+  .ve-explanation-panel {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .mutation-marker {
+    animation: none;
+    opacity: 0.8;
+  }
+
+  .ve-shimmer-line {
+    animation: none;
+    opacity: 0.5;
   }
 }

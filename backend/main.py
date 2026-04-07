@@ -24,14 +24,17 @@ from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
+from collections import defaultdict
+
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 load_dotenv()
 
-from agent.orchestrator import explain_step
+from agent.orchestrator import explain_on_demand, explain_step
 from db.database import create_job, get_job, get_run, init_db, list_jobs, list_runs, save_run, update_job
 from pipeline.esmfold_client import enrich_candidates_with_structure
 from pipeline.mrna_designer import design_construct
@@ -263,6 +266,57 @@ async def get_job_status(job_id: str) -> JSONResponse:
         "updated_at": job["updated_at"],
         "error_msg": job["error_msg"],
     })
+
+
+# ---------------------------------------------------------------------------
+# On-demand AI explanations (Visual Explorer)
+# ---------------------------------------------------------------------------
+
+# In-memory rate limiter: maps client_ip -> list of request timestamps
+_explain_rate_limits: dict[str, list[float]] = defaultdict(list)
+EXPLAIN_RATE_LIMIT = 10  # requests per minute per IP
+EXPLAIN_TIMEOUT_SECONDS = 15
+
+
+class ExplainRequest(BaseModel):
+    context: dict = {}
+    question: str
+
+
+@app.post("/explain")
+async def explain_endpoint(body: ExplainRequest, request: Request) -> JSONResponse:
+    """Generate an on-demand AI explanation for a target or construct segment."""
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Rate limiting
+    now = datetime.now(timezone.utc).timestamp()
+    window = [t for t in _explain_rate_limits[client_ip] if now - t < 60]
+    _explain_rate_limits[client_ip] = window
+
+    if len(window) >= EXPLAIN_RATE_LIMIT:
+        return JSONResponse(
+            {"error": "Rate limit exceeded. Please wait before requesting more explanations."},
+            status_code=429,
+        )
+
+    _explain_rate_limits[client_ip].append(now)
+
+    try:
+        explanation = await asyncio.wait_for(
+            explain_on_demand(body.context, body.question),
+            timeout=EXPLAIN_TIMEOUT_SECONDS,
+        )
+        return JSONResponse({"explanation": explanation})
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            {"error": "Explanation generation timed out."},
+            status_code=504,
+        )
+    except Exception as exc:
+        return JSONResponse(
+            {"error": f"Explanation generation failed: {exc}"},
+            status_code=500,
+        )
 
 
 # ---------------------------------------------------------------------------

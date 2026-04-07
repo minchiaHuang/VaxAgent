@@ -91,6 +91,21 @@ def design_construct(candidates: list[dict], top_n: int = 5) -> dict:
         f"Poly(A):       {'A' * 20}...×{POLY_A_LENGTH}",
     ]
 
+    # Build structured segments array for Visual Explorer construct assembly
+    segments: list[dict] = [
+        {"type": "cap", "label": "5' Cap"},
+        {"type": "utr", "label": "5' UTR"},
+        {"type": "signal", "label": "Signal Peptide"},
+    ]
+    for i, name in enumerate(antigen_names):
+        if i > 0:
+            segments.append({"type": "linker", "label": "Linker"})
+        rank = top[i].get("rank", i + 1) if i < len(top) else i + 1
+        segments.append({"type": "target", "label": name, "rank": rank})
+    segments.append({"type": "stop", "label": "Stop"})
+    segments.append({"type": "utr", "label": "3' UTR"})
+    segments.append({"type": "polya", "label": "Poly(A)"})
+
     return {
         "construct_id": f"MRNA-HCC1395-DRAFT-01",
         "strategy": f"Multi-epitope long-peptide cassette ({top_n} antigens)",
@@ -100,6 +115,7 @@ def design_construct(candidates: list[dict], top_n: int = 5) -> dict:
         "linker": LINKER_AA,
         "payload_summary": payload_summary,
         "sequence_preview": "\n".join(sequence_preview_lines),
+        "segments": segments,
         "utr_5prime": UTR_5,
         "utr_3prime": UTR_3,
         "poly_a_length": POLY_A_LENGTH,
