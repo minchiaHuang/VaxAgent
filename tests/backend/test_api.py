@@ -108,7 +108,12 @@ def test_upload_returns_422_when_parser_raises(app_env, sample_vcf_path) -> None
     assert "bad file" in response.json()["error"]
 
 
-def test_jobs_endpoint_returns_503_when_docker_is_unavailable(app_env, sample_vcf_path) -> None:
+def test_jobs_endpoint_returns_503_when_docker_and_mhcflurry_unavailable(
+    app_env, sample_vcf_path, monkeypatch
+) -> None:
+    from pipeline import mhc_predictor
+
+    monkeypatch.setattr(mhc_predictor, "is_mhcflurry_available", lambda: False)
     with TestClient(app_env.main.app) as client:
         app_env.main._docker_available = False
         response = client.post(
@@ -118,6 +123,7 @@ def test_jobs_endpoint_returns_503_when_docker_is_unavailable(app_env, sample_vc
         )
 
     assert response.status_code == 503
+    assert "mhcflurry" in response.json()["error"].lower()
 
 
 def test_jobs_endpoint_handles_missing_hla_and_success(app_env, sample_vcf_path) -> None:
@@ -153,6 +159,7 @@ def test_jobs_endpoint_handles_missing_hla_and_success(app_env, sample_vcf_path)
     assert no_hla.status_code == 400
     assert success.status_code == 200
     assert success.json()["status"] == "queued"
+    assert success.json()["engine"] == "pvacseq"
     assert jobs.json()["jobs"][0]["job_id"] == job_id
     assert fetched.status_code == 200
     assert missing.status_code == 404
