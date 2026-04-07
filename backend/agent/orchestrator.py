@@ -139,3 +139,101 @@ def _generic_fallback(step: str) -> str:
         "Results are available in the data panel. "
         "Human expert review is recommended before any downstream use."
     )
+
+
+# ---------------------------------------------------------------------------
+# On-demand AI explanations (Visual Explorer)
+# ---------------------------------------------------------------------------
+
+ON_DEMAND_PROMPT_TEMPLATES: dict[str, str] = {
+    "how_immune_binding_works": (
+        "Explain to a pet owner (no biology background) how immune binding works for this "
+        "neoantigen target. The peptide {mt_epitope_seq} binds to {hla_allele} with an IC50 of "
+        "{ic50_mt} nM. Use a simple analogy (like a lock and key). Mention the IC50 value and "
+        "what it means practically. 2-4 sentences, no jargon without definition."
+    ),
+    "why_surface_accessibility_matters": (
+        "Explain to a pet owner why surface accessibility matters for a cancer vaccine target. "
+        "This target has a pLDDT score of {plddt} and is {'surface accessible' if surface_accessible else 'buried'}. "
+        "Use a simple analogy. Explain what happens when a target is buried vs on the surface. "
+        "2-4 sentences, no jargon without definition."
+    ),
+    "clinical_context": (
+        "Briefly describe what is known about {gene} {mutation} in cancer research. "
+        "Frame it for a pet owner - what role does this gene normally play and what happens "
+        "when it is mutated? 2-4 sentences, factual, no overclaiming."
+    ),
+    "construct_segment_purpose": (
+        "Explain what the {segment_type} component of an mRNA vaccine does and why it is needed. "
+        "Frame it for someone with no biology background using a simple analogy. "
+        "2-4 sentences."
+    ),
+}
+
+ON_DEMAND_FALLBACKS: dict[str, str] = {
+    "how_immune_binding_works": (
+        "Your immune system uses special receptor proteins (called HLA) that work like locks. "
+        "The peptide from this mutation fits into the lock tightly - the lower the IC50 number, "
+        "the tighter the fit. A tight fit means immune cells are more likely to recognise and "
+        "attack cells carrying this mutation."
+    ),
+    "why_surface_accessibility_matters": (
+        "For the immune system to target a mutation, it needs to be on the surface of the protein "
+        "where immune cells can reach it - like a flag on a building versus something hidden in the "
+        "basement. When our analysis shows a mutation is surface-accessible, it means the immune "
+        "system has a better chance of finding and attacking it."
+    ),
+    "clinical_context": (
+        "This gene plays an important role in cell growth and repair. When it is mutated, cells "
+        "can grow out of control, which is one of the hallmarks of cancer. Researchers are actively "
+        "studying mutations like this one as potential targets for cancer therapies."
+    ),
+    "construct_segment_purpose": (
+        "This component is part of the mRNA vaccine blueprint. Each part of the mRNA molecule has "
+        "a specific job - some protect the molecule from being broken down, some tell the cell how "
+        "to read the instructions, and others encode the actual vaccine targets."
+    ),
+}
+
+
+async def explain_on_demand(context: dict, question: str) -> str:
+    """Generate an on-demand explanation for the Visual Explorer.
+
+    Uses Claude API if available, otherwise falls back to static text.
+    """
+    if not ANTHROPIC_API_KEY:
+        return ON_DEMAND_FALLBACKS.get(question, "Explanation not available for this question.")
+
+    try:
+        return await _call_claude_on_demand(context, question)
+    except Exception:
+        return ON_DEMAND_FALLBACKS.get(question, "Explanation not available for this question.")
+
+
+async def _call_claude_on_demand(context: dict, question: str) -> str:
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+
+    system_prompt = (
+        "You are explaining cancer vaccine science to a pet owner with no biology background. "
+        "Use simple analogies. Keep it to 2-4 sentences. Do not use jargon without defining it. "
+        "Do not include disclaimers or caveats - the main interface already shows those prominently. "
+        "Use concrete language with actual numbers when available."
+    )
+
+    template = ON_DEMAND_PROMPT_TEMPLATES.get(question, f"Explain: {question}")
+
+    # Format template with context values
+    try:
+        prompt = template.format(**context)
+    except (KeyError, IndexError):
+        prompt = template + f" Context: {context}"
+
+    message = await client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=200,
+        system=system_prompt,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()

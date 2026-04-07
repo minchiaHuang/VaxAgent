@@ -11,9 +11,10 @@ test("fallback mode loads fixture and exports markdown", async ({ page }) => {
 
   await expect(page.locator("#mode-chip")).toHaveText("Fallback fixture");
   await expect(page.locator("#dataset-title")).toHaveText("HCC1395 Breast Cancer Cell Line");
-  await expect(page.locator("#candidate-list .candidate-card")).toHaveCount(5);
-  await expect(page.locator("#explanation-card")).toContainText("TP53 R248W ranks #1");
-  await expect(page.locator("#blueprint-card")).toContainText("MRNA-HCC1395-DRAFT-01");
+
+  // Visual Explorer: funnel scene should be active (Scene 3a)
+  await expect(page.locator("#scene-funnel.is-active")).toBeVisible();
+  await expect(page.locator(".funnel-viz")).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Brief" }).click();
@@ -21,18 +22,51 @@ test("fallback mode loads fixture and exports markdown", async ({ page }) => {
   expect(download.suggestedFilename()).toBe("vaxagent-research-brief.md");
 });
 
-test("backend happy path completes and supports candidate selection", async ({ page }) => {
+test("visual explorer scene navigation works in fallback mode", async ({ page }) => {
+  await page.goto("/?api=http://127.0.0.1:65535&timeout_ms=50");
+  await page.getByRole("button", { name: "Load Benchmark Case" }).click();
+  await expect(page.locator("#mode-chip")).toHaveText("Fallback fixture");
+
+  // Scene 3a: Funnel is shown
+  await expect(page.locator("#scene-funnel.is-active")).toBeVisible();
+
+  // Navigate to Scene 3b: Explorer
+  await page.getByRole("button", { name: "See your targets" }).click();
+  await expect(page.locator("#scene-explorer.is-active")).toBeVisible();
+  await expect(page.locator(".explorer-tabs")).toBeVisible();
+
+  // Click a different target tab
+  await page.locator('.explorer-tab[data-rank="2"]').click();
+
+  // Navigate to Scene 4a: Construct
+  await page.getByRole("button", { name: "View Blueprint" }).click();
+  await expect(page.locator("#scene-construct.is-active")).toBeVisible();
+  await expect(page.locator(".construct-viz")).toBeVisible();
+
+  // Navigate back to Scene 3b
+  await page.getByRole("button", { name: "Back to targets" }).click();
+  await expect(page.locator("#scene-explorer.is-active")).toBeVisible();
+
+  // Navigate back to Scene 3a
+  await page.getByRole("button", { name: "Back to overview" }).click();
+  await expect(page.locator("#scene-funnel.is-active")).toBeVisible();
+});
+
+test("backend happy path completes and shows visual explorer", async ({ page }) => {
   await page.goto(backendQuery);
   await page.getByRole("button", { name: "Load Benchmark Case" }).click();
 
   await expect(page.locator("#mode-chip")).toHaveText("Backend connected");
   await expect(page.locator(".stepper-item.is-complete")).toHaveCount(6);
-  await expect(page.locator("#candidate-list .candidate-card")).toHaveCount(10);
   await expect(page.getByRole("button", { name: "Export Brief" })).toBeEnabled();
   await expect(page.locator("#history-list")).toContainText("HCC1395 Breast Cancer Cell Line");
 
-  await page.locator('[data-rank="2"]').click();
-  await expect(page.locator("#explanation-card")).toContainText("PIK3CA E545K ranks #2");
+  // Visual Explorer should be active with funnel scene
+  await expect(page.locator("#scene-funnel.is-active")).toBeVisible();
+
+  // Navigate to explorer and select a target
+  await page.getByRole("button", { name: "See your targets" }).click();
+  await expect(page.locator("#scene-explorer.is-active")).toBeVisible();
   await expect(page.locator("#limitations-list")).toContainText("Human expert review remains required");
 });
 
@@ -45,7 +79,8 @@ test("quick upload path uses uploaded filename and completes analysis", async ({
   await expect(page.locator("#dataset-title")).toHaveText("test_small.vcf");
   await expect(page.locator("#dataset-banner")).toContainText("User-uploaded VCF file.");
   await expect(page.locator("#summary-grid .summary-card")).toHaveCount(4);
-  await expect(page.locator("#candidate-list .candidate-card")).toHaveCount(10);
+  // Visual Explorer should be active after upload completes
+  await expect(page.locator("#scene-funnel.is-active")).toBeVisible();
   await expect(page.locator("#upload-status")).toContainText("Analysis complete");
   await expect(page.locator("#history-list")).toContainText("test_small.vcf");
 
