@@ -994,6 +994,103 @@ h3 {
   display: block;
 }
 
+/* ── On-demand AI explanations on candidate cards ────────────────────── */
+
+.candidate-explain-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.explain-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.explain-btn:hover {
+  background: var(--accent-soft, #e8f0fe);
+}
+
+.explain-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.candidate-ai-explanation {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-component);
+  background: linear-gradient(135deg, #f0f4ff 0%, #f8f9ff 100%);
+  border-left: 3px solid var(--accent);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.ai-explanation-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.explain-loading {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.explain-error {
+  color: var(--error, #dc2626);
+  font-size: 0.85rem;
+}
+
+/* ── Pipeline step "Why?" explanation panels ─────────────────────────── */
+
+.mini-step-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.why-toggle-mini {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px solid currentColor;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.why-toggle-mini:hover {
+  opacity: 1;
+}
+
+.step-explanation-panel {
+  padding: 8px 12px;
+  border-radius: var(--radius-component);
+  background: var(--bg-subtle);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.step-explanation-text {
+  margin: 0;
+}
+
 .empty-state {
   color: var(--muted);
   font-size: 0.92rem;
