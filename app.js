@@ -622,6 +622,11 @@ function renderAll() {
   renderExplanation();
   renderBlueprint();
   renderLimitations();
+
+  // Re-initialize Lucide icons after dynamic rendering
+  if (typeof lucide !== "undefined") {
+    lucide.createIcons();
+  }
 }
 
 function applyPipelineMessage(message) {
@@ -1379,6 +1384,53 @@ checkDockerAvailability().then((dockerOk) => {
     elements.modeFullBtn.title = "Docker is not available on this machine — Full analysis requires Docker";
   }
 });
+
+// ── Reduced motion preference ────────────────────────────────────────
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+// ── Directional wizard step transitions ──────────────────────────────
+let _previousStep = -1;
+let _transitionLocked = false;
+
+function goToStep(stepIndex) {
+  if (_transitionLocked) return;
+  if (stepIndex === _previousStep) return;
+
+  const direction = stepIndex > _previousStep ? "forward" : "back";
+  const stepperItems = document.querySelectorAll(".stepper-item");
+
+  if (prefersReducedMotion.matches || _previousStep < 0) {
+    _previousStep = stepIndex;
+    return;
+  }
+
+  _transitionLocked = true;
+
+  const outClass = direction === "forward" ? "slide-out-left" : "slide-out-right";
+  const inClass = direction === "forward" ? "slide-in-right" : "slide-in-left";
+
+  const outEl = stepperItems[_previousStep];
+  const inEl = stepperItems[stepIndex];
+
+  if (outEl) outEl.classList.add(outClass);
+
+  const transitionDelay = 150;
+  setTimeout(() => {
+    if (outEl) outEl.classList.remove(outClass);
+    if (inEl) inEl.classList.add(inClass);
+
+    setTimeout(() => {
+      if (inEl) inEl.classList.remove(inClass);
+      _previousStep = stepIndex;
+      _transitionLocked = false;
+    }, 250);
+  }, transitionDelay);
+}
+
+// ── Initialize Lucide icons ──────────────────────────────────────────
+if (typeof lucide !== "undefined") {
+  lucide.createIcons();
+}
 
 updateStatus("idle", state.statusMessage);
 renderAll();
