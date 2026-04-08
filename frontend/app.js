@@ -26,9 +26,9 @@ const PIPELINE_STEPS = [
 const WIZARD_STEPS = [
   { id: 1, key: "diagnosis", title: "Diagnosis", label: "Tell us about the diagnosis" },
   { id: 2, key: "upload", title: "Upload", label: "Upload your tumor data" },
-  { id: 3, key: "candidates", title: "Targets", label: "Your top vaccine targets" },
-  { id: 4, key: "blueprint", title: "Blueprint", label: "Your vaccine blueprint" },
-  { id: 5, key: "next_steps", title: "Next Steps", label: "What to do next" }
+  { id: 3, key: "candidates", title: "Understand Targets", label: "Understand your top vaccine target" },
+  { id: 4, key: "blueprint", title: "Blueprint", label: "Understand the vaccine blueprint" },
+  { id: 5, key: "next_steps", title: "Discuss", label: "Prepare for the vet discussion" }
 ];
 
 /* ── Sequencing guidance by cancer type ───────────────────────────────── */
@@ -334,6 +334,9 @@ const elements = {
   // Step 3
   summaryBar: document.getElementById("summary-bar"),
   summaryGrid: document.getElementById("summary-grid"),
+  targetOverview: document.getElementById("target-overview"),
+  targetPrimary: document.getElementById("target-primary"),
+  targetCompare: document.getElementById("target-compare"),
   candidateList: document.getElementById("candidate-list"),
   rawCandidatesArea: document.getElementById("raw-candidates-area"),
   toggleRawCandidates: document.getElementById("toggle-raw-candidates"),
@@ -341,6 +344,9 @@ const elements = {
 
   // Step 4
   blueprintCard: document.getElementById("blueprint-card"),
+  blueprintRationale: document.getElementById("blueprint-rationale"),
+  blueprintConstruct: document.getElementById("blueprint-construct"),
+  blueprintVetPrep: document.getElementById("blueprint-vetprep"),
   blueprintActions: document.getElementById("blueprint-actions"),
   exportButton: document.getElementById("export-brief"),
   toggleTechnical: document.getElementById("toggle-technical"),
@@ -513,9 +519,9 @@ function updateWizardNav() {
   // Contextual button text
   const labels = {
     1: "Continue",
-    2: state.loaded ? "See Vaccine Targets" : "Continue",
+    2: state.loaded ? "Understand Top Target" : "Continue",
     3: "View Blueprint",
-    4: "See Next Steps"
+    4: "Prepare For Vet Discussion"
   };
   elements.wizardNext.textContent = labels[state.wizardStep] || "Continue";
 }
@@ -710,6 +716,203 @@ function buildCandidateNarrative(candidate) {
   };
 }
 
+function confidenceTone(plddt) {
+  if (plddt > 80) return "is-high";
+  if (plddt > 60) return "is-medium";
+  return "is-low";
+}
+
+function structureSourceText(source) {
+  if (source === "alphafold") return "Full-protein reference model";
+  if (source === "esmfold") return "Live AI-folded peptide model";
+  return "Heuristic structural estimate";
+}
+
+function scoreTakeaway(candidate) {
+  if (candidate.priority_score >= 70) return "Strong overall fit for a first-pass vaccine candidate.";
+  if (candidate.priority_score >= 50) return "Reasonable candidate, but with a few tradeoffs to watch.";
+  return "Useful as a backup candidate rather than a leading choice.";
+}
+
+function evidenceRow(label, value, detail, tone = "") {
+  return `
+    <article class="evidence-row ${tone}">
+      <div class="evidence-row-main">
+        <p class="evidence-row-label">${label}</p>
+        <p class="evidence-row-value">${value}</p>
+      </div>
+      <p class="evidence-row-detail">${detail}</p>
+    </article>
+  `;
+}
+
+function buildTargetOverview(candidate) {
+  const binding = bindingLabel(candidate.ic50_mt);
+  const isDemo = state.mode === "fallback";
+  return `
+    <section class="decision-hero reveal">
+      <div class="decision-hero-copy">
+        <div class="origin-badge ${isDemo ? 'is-benchmark' : 'is-uploaded'}">${isDemo ? 'Benchmark data' : 'From your file'}</div>
+        <p class="decision-kicker">Top target right now</p>
+        <h3>${escapeHtml(candidate.gene)} ${escapeHtml(candidate.mutation)}</h3>
+        <p class="decision-summary">
+          This mutation is the current lead because it balances immune visibility, tumor coverage, and specificity better than the other shortlisted options.
+        </p>
+        <p class="decision-takeaway">${scoreTakeaway(candidate)}</p>
+      </div>
+      <div class="decision-hero-aside">
+        <div class="decision-score">
+          <span>Priority score</span>
+          <strong>${candidate.priority_score}</strong>
+        </div>
+        <div class="candidate-badges">
+          <span class="binding-badge ${binding.css}">${binding.text}</span>
+          <span class="confidence-badge ${confidenceTone(candidate.plddt)}">${confidenceLabel(candidate.plddt)}</span>
+          <span class="confidence-badge ${candidate.surface_accessible ? "is-high" : "is-medium"}">${surfaceLabel(candidate.surface_accessible)}</span>
+          ${structureSourceBadge(candidate.structure_source)}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function buildTargetPrimary(candidate) {
+  const narrative = buildCandidateNarrative(candidate);
+  const structureDetail = `${structureSourceText(candidate.structure_source || "heuristic")} with pLDDT ${candidate.plddt || "N/A"}.`;
+  const uncertainty = candidate.surface_accessible
+    ? "The structure signal is supportive, but still computational. Treat this as confidence-building evidence, not proof."
+    : "The target still ranks well overall, but its predicted reachability is less favorable, so it deserves extra caution in any downstream review.";
+
+  return `
+    <section class="decision-section reveal">
+      <div class="decision-section-header">
+        <div>
+          <p class="section-kicker">Why this matters</p>
+          <h3>Why ${escapeHtml(candidate.gene)} ${escapeHtml(candidate.mutation)} is the lead target</h3>
+        </div>
+        <button class="explain-btn" data-explain-rank="${candidate.rank}" data-explain-q="explain_priority_score" type="button">Why this score?</button>
+      </div>
+      <p class="decision-copy">${narrative.summary}</p>
+      <div class="why-grid">
+        <article class="why-card">
+          <h4>What makes it attractive</h4>
+          <ul class="decision-list">${narrative.bullets.map((item) => `<li>${item}</li>`).join("")}</ul>
+        </article>
+        <article class="why-card">
+          <h4>What to keep in mind</h4>
+          <p>${uncertainty}</p>
+          <div class="risk-notice">${narrative.caution}</div>
+        </article>
+      </div>
+      <div class="evidence-grid">
+        ${evidenceRow("Binding strength", `${candidate.ic50_mt} nM`, "Lower IC50 means the immune system is more likely to grab this peptide.", "is-positive")}
+        ${evidenceRow("Tumor presence", formatPercent(candidate.tumor_dna_vaf || 0), `${clonalityLabel(candidate.clonality)}. More shared tumor cells means broader coverage.`, "is-neutral")}
+        ${evidenceRow("Gene activity", `${candidate.gene_expression_tpm} TPM`, "Higher expression makes it more likely that the tumor is actually producing this target.", "is-neutral")}
+        ${evidenceRow("Structure confidence", confidenceLabel(candidate.plddt), `${structureDetail} ${candidate.surface_accessible ? "Predicted to be reachable." : "Predicted to be harder to reach."}`, candidate.surface_accessible ? "is-positive" : "is-caution")}
+      </div>
+      ${scoringBars(candidate)}
+      <div class="candidate-explain-row">
+        ${candidate.structure_source && candidate.structure_source !== "heuristic" ? `<button class="explain-btn" data-explain-rank="${candidate.rank}" data-explain-q="explain_structure_source" type="button">About the structure evidence</button>` : ""}
+        ${candidate.ic50_source && candidate.ic50_source !== "fixture" ? `<button class="explain-btn" data-explain-rank="${candidate.rank}" data-explain-q="explain_ic50_source" type="button">About the binding engine</button>` : ""}
+      </div>
+      <div class="candidate-ai-explanation" id="ai-explain-${candidate.rank}" hidden></div>
+    </section>
+  `;
+}
+
+function buildCompareCard(candidate, activeRank) {
+  const binding = bindingLabel(candidate.ic50_mt);
+  return `
+    <button class="compare-card ${candidate.rank === activeRank ? "is-active" : ""}" data-rank="${candidate.rank}" type="button">
+      <div class="compare-card-header">
+        <span class="compare-rank">#${candidate.rank}</span>
+        <span class="compare-score">Score ${candidate.priority_score}</span>
+      </div>
+      <h4>${escapeHtml(candidate.gene)} ${escapeHtml(candidate.mutation)}</h4>
+      <p>${escapeHtml(candidate.hla_allele)} · ${binding.text.toLowerCase()}</p>
+      <div class="candidate-badges">
+        <span class="binding-badge ${binding.css}">${binding.text}</span>
+        <span class="confidence-badge ${confidenceTone(candidate.plddt)}">${confidenceLabel(candidate.plddt)}</span>
+      </div>
+    </button>
+  `;
+}
+
+function buildAdditionalCandidate(candidate) {
+  return `
+    <article class="candidate-mini-card">
+      <div>
+        <h4>#${candidate.rank} ${escapeHtml(candidate.gene)} ${escapeHtml(candidate.mutation)}</h4>
+        <p>${escapeHtml(candidate.hla_allele)} · Score ${candidate.priority_score} · ${confidenceLabel(candidate.plddt)}</p>
+      </div>
+      <button class="secondary-button candidate-mini-action" data-rank="${candidate.rank}" type="button">Make primary view</button>
+    </article>
+  `;
+}
+
+function wireTargetSelection(container) {
+  container?.querySelectorAll("[data-rank]").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".explain-btn")) return;
+      state.selectedCandidateRank = Number(card.dataset.rank);
+      renderCandidates();
+    });
+  });
+}
+
+function wireExplainButtons(scope = document) {
+  scope.querySelectorAll(".explain-btn[data-explain-rank]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const rank = Number(btn.dataset.explainRank);
+      const question = btn.dataset.explainQ;
+      const candidate = state.candidates.find((c) => c.rank === rank);
+      const panel = document.getElementById(`ai-explain-${rank}`);
+      if (!candidate || !panel) return;
+
+      btn.disabled = true;
+      btn.textContent = "Loading…";
+      panel.hidden = false;
+      panel.innerHTML = '<span class="explain-loading">Generating explanation…</span>';
+
+      try {
+        const context = {
+          gene: candidate.gene,
+          mutation: candidate.mutation,
+          mt_epitope_seq: candidate.mt_epitope_seq,
+          priority_score: candidate.priority_score,
+          structure_source: candidate.structure_source || "heuristic",
+          ic50_source: candidate.ic50_source || "fixture",
+          plddt: candidate.plddt,
+          ic50_mt: candidate.ic50_mt,
+          hla_allele: candidate.hla_allele,
+          surface_accessible: candidate.surface_accessible,
+        };
+        const res = await fetch(`${API_ORIGIN}/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ context, question }),
+        });
+        const data = await res.json();
+        if (data.explanation) {
+          panel.innerHTML = `<p class="ai-explanation-text">${escapeHtml(data.explanation)}</p>`;
+        } else {
+          panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
+        }
+      } catch (_err) {
+        panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = question === "explain_priority_score"
+          ? "Why this score?"
+          : question === "explain_structure_source"
+            ? "About the structure evidence"
+            : "About the binding engine";
+      }
+    });
+  });
+}
+
 function scoringBars(c) {
   const bindingPct = Math.max(0, Math.min(100, (1 - c.ic50_mt / 500) * 100));
   const presencePct = Math.min(100, (c.tumor_dna_vaf || 0) * 200);
@@ -745,9 +948,16 @@ function scoringBars(c) {
 
 function renderCandidates() {
   if (!state.candidates.length) {
+    elements.targetOverview.className = "target-overview empty-state";
+    elements.targetOverview.textContent = "Upload your data or try the demo to see why the top target stands out.";
+    elements.targetPrimary.className = "target-primary empty-state";
+    elements.targetPrimary.textContent = "A detailed explanation of the strongest target will appear here once analysis is complete.";
+    elements.targetCompare.className = "target-compare empty-state";
+    elements.targetCompare.textContent = "Comparison cards for additional targets will appear here.";
     elements.candidateList.className = "candidate-list empty-state";
-    elements.candidateList.textContent = "Upload your data or try the demo to see vaccine targets.";
+    elements.candidateList.textContent = "Upload your data or try the demo to compare additional targets.";
     elements.summaryBar.hidden = true;
+    document.getElementById("ranking-explainer")?.setAttribute("hidden", "hidden");
     return;
   }
 
@@ -767,129 +977,60 @@ function renderCandidates() {
         <p class="summary-card-value">${m.value}</p>
       </article>
     `).join("");
+  } else {
+    elements.summaryBar.hidden = true;
   }
 
-  // Show ranking explainer
   document.getElementById('ranking-explainer')?.removeAttribute('hidden');
 
-  // Origin badge + Candidate cards
-  const isDemo = state.mode === "fallback";
-  elements.candidateList.className = "candidate-list";
-  const originBadge = `<div class="origin-badge ${isDemo ? 'is-benchmark' : 'is-uploaded'}">${isDemo ? 'Benchmark data' : 'From your file'}</div>`;
-  elements.candidateList.innerHTML = originBadge + state.candidates.map((c) => {
-    const selected = c.rank === state.selectedCandidateRank ? "is-selected" : "";
-    const binding = bindingLabel(c.ic50_mt);
-    const narrative = buildCandidateNarrative(c);
+  const primaryCandidate =
+    state.candidates.find((c) => c.rank === state.selectedCandidateRank) ||
+    state.candidates[0];
+  state.selectedCandidateRank = primaryCandidate.rank;
 
-    return `
-      <div class="candidate-card reveal ${selected}" data-rank="${c.rank}">
-        <div class="candidate-rank">#${c.rank}</div>
+  elements.targetOverview.className = "target-overview";
+  elements.targetOverview.innerHTML = buildTargetOverview(primaryCandidate);
+
+  elements.targetPrimary.className = "target-primary";
+  elements.targetPrimary.innerHTML = buildTargetPrimary(primaryCandidate);
+
+  const topThree = state.candidates.slice(0, 3);
+  elements.targetCompare.className = "target-compare";
+  elements.targetCompare.innerHTML = `
+    <section class="decision-section reveal">
+      <div class="decision-section-header">
         <div>
-          <div class="candidate-header">
-            <h3>${escapeHtml(c.gene)} ${escapeHtml(c.mutation)}</h3>
-          </div>
-          <p class="candidate-meta">${clonalityLabel(c.clonality)} &middot; ${vafLabel(c.tumor_dna_vaf)}</p>
-          <div class="candidate-badges">
-            <span class="binding-badge ${binding.css}">${binding.text}</span>
-            ${c.surface_accessible ? '<span class="binding-badge is-strong">Surface accessible</span>' : ""}
-            ${structureSourceBadge(c.structure_source)}
-          </div>
-          ${selected ? `
-            <div class="candidate-detail">
-              <p>${narrative.summary}</p>
-              <ul>${narrative.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>
-              ${scoringBars(c)}
-              <div class="guardrail">${narrative.caution}</div>
-              <div class="candidate-explain-row">
-                <button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_priority_score" type="button">Why this score?</button>
-                ${c.structure_source && c.structure_source !== "heuristic" ? `<button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_structure_source" type="button">About ${c.structure_source === "alphafold" ? "AlphaFold" : "ESMFold"} data</button>` : ""}
-                ${c.ic50_source && c.ic50_source !== "fixture" ? `<button class="explain-btn" data-explain-rank="${c.rank}" data-explain-q="explain_ic50_source" type="button">About ${c.ic50_source}</button>` : ""}
-              </div>
-              <div class="candidate-ai-explanation" id="ai-explain-${c.rank}" hidden></div>
-              <button class="tech-toggle" data-tech-rank="${c.rank}" type="button">Show technical values</button>
-              <div class="tech-values" id="tech-${c.rank}">IC50: ${c.ic50_mt} nM | Expression: ${c.gene_expression_tpm} TPM | VAF: ${formatPercent(c.tumor_dna_vaf || 0)} | Fold change: ${c.fold_change}x | pLDDT: ${c.plddt} | Structure: ${c.structure_source || "heuristic"} | Prediction: ${c.ic50_source || "fixture"} | Peptide: ${c.mt_epitope_seq} | HLA: ${c.hla_allele}</div>
-            </div>
-          ` : ""}
-        </div>
-        <div class="candidate-score">
-          <span>Score</span>
-          <strong>${c.priority_score}</strong>
+          <p class="section-kicker">Compare options</p>
+          <h3>How the top 3 targets stack up</h3>
         </div>
       </div>
-    `;
-  }).join("");
+      <p class="decision-copy">Use these cards to switch the primary explanation and compare how each leading target balances strength, certainty, and tumor coverage.</p>
+      <div class="compare-grid">
+        ${topThree.map((candidate) => buildCompareCard(candidate, primaryCandidate.rank)).join("")}
+      </div>
+    </section>
+  `;
 
-  // Wire click handlers
-  elements.candidateList.querySelectorAll("[data-rank]").forEach((card) => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".tech-toggle") || e.target.closest(".explain-btn")) return;
-      state.selectedCandidateRank = Number(card.dataset.rank);
-      renderCandidates();
-    });
-  });
-
-  // Wire tech toggles
-  elements.candidateList.querySelectorAll(".tech-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const rank = btn.dataset.techRank;
-      const el = document.getElementById(`tech-${rank}`);
-      if (el) el.classList.toggle("is-visible");
-    });
-  });
-
-  // Wire on-demand AI explanation buttons on candidate cards
-  elements.candidateList.querySelectorAll(".explain-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const rank = Number(btn.dataset.explainRank);
-      const question = btn.dataset.explainQ;
-      const candidate = state.candidates.find((c) => c.rank === rank);
-      const panel = document.getElementById(`ai-explain-${rank}`);
-      if (!candidate || !panel) return;
-
-      btn.disabled = true;
-      btn.textContent = "Loading…";
-      panel.hidden = false;
-      panel.innerHTML = '<span class="explain-loading">Generating explanation…</span>';
-
-      try {
-        const context = {
-          gene: candidate.gene,
-          mutation: candidate.mutation,
-          priority_score: candidate.priority_score,
-          structure_source: candidate.structure_source || "heuristic",
-          ic50_source: candidate.ic50_source || "fixture",
-          plddt: candidate.plddt,
-          ic50_mt: candidate.ic50_mt,
-          hla_allele: candidate.hla_allele,
-          surface_accessible: candidate.surface_accessible,
-        };
-        const res = await fetch(`${API_ORIGIN}/explain`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ context, question }),
-        });
-        const data = await res.json();
-        if (data.explanation) {
-          panel.innerHTML = `<p class="ai-explanation-text">${escapeHtml(data.explanation)}</p>`;
-          btn.textContent = "Hide";
-          btn.addEventListener("click", () => { panel.hidden = !panel.hidden; }, { once: true });
-        } else {
-          panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
-          btn.textContent = "Try again";
-          btn.disabled = false;
-        }
-      } catch (_err) {
-        panel.innerHTML = `<span class="explain-error">Could not load explanation.</span>`;
-        btn.textContent = "Try again";
-        btn.disabled = false;
-      }
-    });
-  });
+  const remaining = state.candidates.slice(3);
+  elements.candidateList.className = "candidate-list";
+  elements.candidateList.innerHTML = remaining.length ? `
+    <details class="candidate-more-list reveal">
+      <summary>See backup targets (${remaining.length})</summary>
+      <div class="candidate-mini-grid">
+        ${remaining.map((candidate) => buildAdditionalCandidate(candidate)).join("")}
+      </div>
+    </details>
+  ` : `
+    <div class="support-note reveal">No additional backup targets were shortlisted beyond the leading group.</div>
+  `;
 
   // Raw data for Step 3
   elements.rawCandidatesArea.hidden = false;
   elements.rawCandidatesBlock.textContent = JSON.stringify(state.candidates, null, 2);
+
+  wireTargetSelection(elements.targetCompare);
+  wireTargetSelection(elements.candidateList);
+  wireExplainButtons(elements.targetPrimary);
 }
 
 /* ── Rendering: Step 4 — Blueprint ───────────────────────────────────── */
@@ -914,8 +1055,8 @@ function renderBlueprintAnnotations(blueprint) {
   return `<div class="construct-annotations">
     <p class="construct-annotations-title">What each part does:</p>
     <div class="construct-bar">${parts.map(p =>
-      `<div class="construct-segment" style="background:${p.color}" title="${p.desc}">
-        <span class="segment-label">${p.label}</span>
+      `<div class="construct-bar-segment" style="background:${p.color}" title="${p.desc}">
+        <span class="construct-bar-label">${p.label}</span>
       </div>`
     ).join('')}</div>
     <div class="construct-legend">${parts.filter((p,i,a) => a.findIndex(x => x.label === p.label) === i).map(p =>
@@ -928,27 +1069,52 @@ function renderBlueprint() {
   if (!state.blueprint) {
     elements.blueprintCard.className = "blueprint-card empty-state";
     elements.blueprintCard.textContent = "The vaccine blueprint will appear after analysis is complete.";
+    elements.blueprintRationale.className = "blueprint-rationale empty-state";
+    elements.blueprintRationale.textContent = "The rationale behind the construct will appear here after analysis is complete.";
+    elements.blueprintVetPrep.className = "blueprint-vetprep empty-state";
+    elements.blueprintVetPrep.textContent = "Vet discussion prompts and safety framing will appear here after analysis is complete.";
+    elements.blueprintConstruct.hidden = true;
     elements.blueprintActions.hidden = true;
     elements.technicalDetails.hidden = true;
     return;
   }
 
   const bp = state.blueprint;
+  const topCandidates = state.candidates.slice(0, Math.min(3, state.candidates.length));
+  const topLead = state.candidates[0];
+
   elements.blueprintCard.className = "blueprint-card reveal";
   elements.blueprintCard.innerHTML = `
+    <section class="decision-hero">
+      <div class="decision-hero-copy">
+        <p class="decision-kicker">Blueprint overview</p>
+        <h3>${escapeHtml(bp.strategy)}</h3>
+        <p class="decision-summary">
+          This draft mRNA construct packages the strongest ranked targets into one sequence so a lab team can review a single, coherent vaccine concept instead of disconnected fragments.
+        </p>
+        <p class="decision-takeaway">
+          The lead target is still <strong>${topLead ? `${escapeHtml(topLead.gene)} ${escapeHtml(topLead.mutation)}` : "the top-ranked candidate"}</strong>, but the blueprint broadens coverage by combining multiple candidates in one design.
+        </p>
+      </div>
+      <div class="decision-hero-aside">
+        <div class="decision-score">
+          <span>Targets included</span>
+          <strong>${bp.antigen_count || state.candidates.length}</strong>
+        </div>
+        <div class="decision-score is-secondary">
+          <span>Total length</span>
+          <strong>${bp.total_length_nt}</strong>
+        </div>
+      </div>
+    </section>
     <div class="blueprint-summary">
       <div class="blueprint-section">
-        <h4>What to synthesize</h4>
-        <p>A multi-target vaccine construct containing <strong>${bp.antigen_count || state.candidates.length} vaccine targets</strong> from the highest-ranked mutations found in the tumor.</p>
-        <p>Each target is a short protein fragment that the immune system can learn to recognize and attack.</p>
+        <h4>What this draft is trying to do</h4>
+        <p>Encode several tumor-specific targets in one molecule, then surround them with standard support regions that help cells read and present the targets to the immune system.</p>
       </div>
       <div class="blueprint-section">
-        <h4>Why these targets</h4>
-        <p>These targets were selected because they combine strong immune binding, active production by the tumor, and enough difference from normal proteins to minimize the risk of the immune system attacking healthy tissue.</p>
-      </div>
-      <div class="blueprint-section">
-        <h4>What to expect</h4>
-        <p>This blueprint is a starting point for discussion with your veterinarian and a synthesis lab. It is <strong>not</strong> a ready-to-manufacture design — it requires professional review, wet-lab validation, and formulation.</p>
+        <h4>What it is not yet</h4>
+        <p>A synthesis-ready therapy. It still needs formulation choices, wet-lab validation, and professional review before anyone should treat it as a real product.</p>
       </div>
     </div>
     <dl class="blueprint-metadata">
@@ -957,18 +1123,80 @@ function renderBlueprint() {
       <div><dt>Targets included</dt><dd>${bp.antigen_count || state.candidates.length}</dd></div>
       <div><dt>Total length</dt><dd>${bp.total_length_nt} nucleotides</dd></div>
     </dl>
-    <ul style="margin-top:14px;padding-left:18px;color:var(--muted);line-height:1.7;">
-      ${bp.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
-    </ul>
-    ${renderBlueprintAnnotations(bp)}
+  `;
+
+  elements.blueprintRationale.className = "blueprint-rationale";
+  elements.blueprintRationale.innerHTML = `
+    <section class="decision-section reveal">
+      <div class="decision-section-header">
+        <div>
+          <p class="section-kicker">Why this design</p>
+          <h3>How the construct balances coverage and explainability</h3>
+        </div>
+      </div>
+      <div class="why-grid">
+        <article class="why-card">
+          <h4>Ordering logic</h4>
+          <p>The antigen cassette follows the ranking order so the strongest candidates lead the story and the backup candidates still contribute broader tumor coverage.</p>
+          <ul class="decision-list">
+            ${topCandidates.map((candidate) => `<li><strong>#${candidate.rank}</strong> ${escapeHtml(candidate.gene)} ${escapeHtml(candidate.mutation)} · score ${candidate.priority_score}</li>`).join("")}
+          </ul>
+        </article>
+        <article class="why-card">
+          <h4>Support segments</h4>
+          <p>The non-target regions handle stability, translation, and presentation. They do not add new tumor targets, but they make the payload readable as an mRNA construct.</p>
+          <div class="evidence-grid compact">
+            ${evidenceRow("Signal peptide", bp.signal_peptide || "Included", "Helps direct the expressed payload into the immune presentation pathway.", "is-neutral")}
+            ${evidenceRow("5' UTR", `${(bp.utr_5prime || "").length} bases`, "Supports translation initiation and efficient reading of the message.", "is-neutral")}
+            ${evidenceRow("3' UTR + Poly(A)", `${(bp.utr_3prime || "").length} + ${bp.poly_a_length || 0} bases`, "Improves stability and persistence long enough for presentation.", "is-neutral")}
+          </div>
+        </article>
+      </div>
+      ${renderBlueprintAnnotations(bp)}
+    </section>
+  `;
+
+  elements.blueprintConstruct.hidden = false;
+  renderConstructScene();
+  if ((bp.segments || []).length) {
+    const firstTargetIndex = (bp.segments || []).findIndex((segment) => segment.type === "target");
+    if (firstTargetIndex >= 0) {
+      selectConstructSegment(firstTargetIndex, bp.segments);
+    }
+  }
+
+  elements.blueprintVetPrep.className = "blueprint-vetprep";
+  elements.blueprintVetPrep.innerHTML = `
+    <section class="decision-section reveal">
+      <div class="decision-section-header">
+        <div>
+          <p class="section-kicker">Safety and limits</p>
+          <h3>What to bring into the vet conversation</h3>
+        </div>
+      </div>
+      <div class="why-grid">
+        <article class="why-card">
+          <h4>Important limits</h4>
+          <ul class="decision-list">
+            ${bp.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}
+          </ul>
+        </article>
+        <article class="why-card">
+          <h4>Discussion checklist</h4>
+          <ul class="decision-list">
+            <li>Ask whether the top-ranked targets match the clinical goals for this case.</li>
+            <li>Ask which validation steps would be required before any synthesis discussion.</li>
+            <li>Ask whether a multi-target mRNA approach is realistic for your pet’s disease stage and care plan.</li>
+            <li>Ask what additional evidence, if any, your vet would want beyond this computational ranking.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
   `;
 
   elements.blueprintActions.hidden = false;
   elements.exportButton.disabled = !(state.reportUrl || state.mode === "fallback");
   elements.sequenceBlock.textContent = bp.sequence_preview;
-
-  // Show explain-blueprint button
-  document.getElementById("explain-blueprint")?.removeAttribute("hidden");
 
   // Raw data for Step 4
   elements.rawBlueprintArea.hidden = false;
@@ -1738,6 +1966,13 @@ function buildDefaultSegments() {
   return segs;
 }
 
+function focusCandidateFromBlueprint(rank) {
+  state.selectedCandidateRank = rank;
+  goToStep(3);
+  renderCandidates();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function selectConstructSegment(index, segments) {
   const seg = segments[index];
   if (!seg) return;
@@ -1778,8 +2013,8 @@ function selectConstructSegment(index, segments) {
         ${candidate.surface_accessible !== false ? "Surface accessible" : "Buried"}
       </p>
       <button class="ve-retry-link" style="margin-top:4px;"
-        onclick="activateScene('3b'); switchExplorerTarget(${candidate.rank});">
-        See details in explorer \u2192
+        onclick="focusCandidateFromBlueprint(${candidate.rank})">
+        Reopen this target in Step 3 \u2192
       </button>
     `;
   }
@@ -1945,10 +2180,6 @@ function applyPipelineMessage(message) {
   elements.pipelineStatus.textContent =
     state.stepExplanations[message.step] || PIPELINE_STEPS.find((s) => s.key === message.step)?.detail || "Processing...";
 
-  // Enter visual explorer when data is ready
-  if (message.step === "pipeline_complete" && message.status === "complete") {
-    enterVisualExplorer();
-  }
 }
 
 function applyFallbackRun() {
@@ -1980,7 +2211,6 @@ function applyFallbackRun() {
   renderBlueprint();
   updateVetLetter();
   goToStep(3);
-  enterVisualExplorer();
 }
 
 /* ── Vet letter template ─────────────────────────────────────────────── */

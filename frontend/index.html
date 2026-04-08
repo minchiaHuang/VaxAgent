@@ -43,7 +43,7 @@
           </li>
           <li class="wizard-progress-step is-locked" data-step="3">
             <span class="wizard-dot">3</span>
-            <span class="wizard-step-label">Targets</span>
+            <span class="wizard-step-label">Understand</span>
           </li>
           <li class="wizard-progress-step is-locked" data-step="4">
             <span class="wizard-dot">4</span>
@@ -51,7 +51,7 @@
           </li>
           <li class="wizard-progress-step is-locked" data-step="5">
             <span class="wizard-dot">5</span>
-            <span class="wizard-step-label">Next Steps</span>
+            <span class="wizard-step-label">Discuss</span>
           </li>
         </ol>
       </nav>
@@ -252,157 +252,32 @@
         <section id="step-candidates" class="wizard-step panel" data-step="3">
           <div class="section-heading">
             <p class="section-kicker">Step 3</p>
-            <h2>Your top vaccine targets</h2>
-            <p class="step-intro">These are the mutations most likely to make effective vaccine targets, ranked by how well the immune system can recognize them.</p>
-          </div>
-
-          <!-- ═══════ Scene 3a: Funnel Visualization (Visual Explorer) ═══════ -->
-          <div class="scene-container funnel-scene" id="scene-funnel">
-            <div class="section-heading">
-              <p class="section-kicker">Filtering Pipeline</p>
-              <h2 class="scene-heading">What we found in your data</h2>
-            </div>
-            <p class="scene-subheading">
-              Thousands of mutations were filtered down through successive stages to identify the strongest vaccine targets.
-            </p>
-
-            <!-- Desktop: animated SVG -->
-            <div class="funnel-svg-wrap" id="funnel-svg-wrap">
-              <svg class="funnel-viz" id="funnel-viz" viewBox="0 0 600 380" aria-label="Mutation filtering funnel">
-                <defs>
-                  <linearGradient id="funnelGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--ve-primary-soft)" />
-                    <stop offset="100%" stop-color="var(--ve-primary)" stop-opacity="0.2" />
-                  </linearGradient>
-                </defs>
-                <!-- Connector lines (drawn between tiers) -->
-                <path class="funnel-connector" id="fc-1" d="M100,66 L140,110" opacity="0" />
-                <path class="funnel-connector" id="fc-2" d="M500,66 L460,110" opacity="0" />
-                <path class="funnel-connector" id="fc-3" d="M160,166 L200,210" opacity="0" />
-                <path class="funnel-connector" id="fc-4" d="M440,166 L400,210" opacity="0" />
-                <path class="funnel-connector" id="fc-5" d="M220,266 L250,310" opacity="0" />
-                <path class="funnel-connector" id="fc-6" d="M380,266 L350,310" opacity="0" />
-
-                <!-- Tier 1: Total variants -->
-                <g class="funnel-tier" data-tier="1">
-                  <rect class="funnel-bar" data-tier="1" x="40" y="26" width="0" height="40" />
-                  <text class="funnel-count" data-tier="1" x="300" y="46" text-anchor="middle">0</text>
-                  <text class="funnel-label" x="300" y="82" text-anchor="middle">variants found</text>
-                </g>
-                <!-- Tier 2: Protein-changing -->
-                <g class="funnel-tier" data-tier="2">
-                  <rect class="funnel-bar" data-tier="2" x="100" y="120" width="0" height="40" />
-                  <text class="funnel-count" data-tier="2" x="300" y="140" text-anchor="middle">0</text>
-                  <text class="funnel-label" x="300" y="176" text-anchor="middle">change proteins</text>
-                </g>
-                <!-- Tier 3: Candidates screened -->
-                <g class="funnel-tier" data-tier="3">
-                  <rect class="funnel-bar" data-tier="3" x="160" y="220" width="0" height="40" />
-                  <text class="funnel-count" data-tier="3" x="300" y="240" text-anchor="middle">0</text>
-                  <text class="funnel-label" x="300" y="276" text-anchor="middle">potential targets screened</text>
-                </g>
-                <!-- Tier 4: Top targets (emphasized) -->
-                <g class="funnel-tier" data-tier="4">
-                  <rect class="funnel-bar" data-tier="4" x="220" y="320" width="0" height="40" />
-                  <text class="funnel-count" data-tier="4" x="300" y="340" text-anchor="middle">0</text>
-                  <text class="funnel-label" x="300" y="370" text-anchor="middle">top targets selected</text>
-                </g>
-              </svg>
-            </div>
-
-            <!-- Mobile: static list -->
-            <div class="funnel-static" id="funnel-static">
-              <ul class="funnel-static-list" id="funnel-static-list"></ul>
-            </div>
-
-            <div class="funnel-explanation" id="funnel-explanation" style="opacity:0"></div>
-          </div>
-
-          <!-- ═══════ Scene 3b: Target Explorer (Visual Explorer) ═══════ -->
-          <div class="scene-container explorer-scene" id="scene-explorer">
-            <div class="section-heading">
-              <p class="section-kicker">Target Explorer</p>
-              <h2 class="scene-heading">Your vaccine targets</h2>
-            </div>
-            <p class="scene-subheading">
-              Each target was checked for immune accessibility. Click a target tab to explore how the immune system can reach it.
-            </p>
-
-            <p class="inline-context">Even if a target looks promising on paper, the immune system can only reach it if it's exposed on the cell surface — like a handle on the outside of a door. Targets buried inside the protein are less likely to work as vaccine targets. The confidence score tells you how much to trust the structural prediction.</p>
-
-            <!-- Desktop: protein schematic -->
-            <div class="explorer-schematic" id="explorer-schematic">
-              <svg id="protein-svg" viewBox="0 0 500 360" aria-label="Protein schematic">
-                <defs>
-                  <linearGradient id="proteinGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="var(--ve-primary-soft)" />
-                    <stop offset="100%" stop-color="#ffffff" />
-                  </linearGradient>
-                  <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
-                    <feFlood flood-color="#15803d" flood-opacity="0.5" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                      <feMergeNode in="glow" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                  <filter id="glowAmber" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
-                    <feFlood flood-color="#a16207" flood-opacity="0.5" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                      <feMergeNode in="glow" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                <!-- Cell membrane (outer organic blob) -->
-                <ellipse class="protein-membrane" cx="250" cy="180" rx="210" ry="150" />
-
-                <!-- Protein body (inner region) -->
-                <ellipse class="protein-body" cx="250" cy="185" rx="140" ry="100" />
-
-                <!-- Labels -->
-                <text class="schematic-label" x="460" y="50">Cell membrane</text>
-                <path class="schematic-label-connector" d="M458,53 L430,100" />
-                <text class="schematic-label" x="50" y="125">Protein surface</text>
-                <path class="schematic-label-connector" d="M128,127 L145,145" />
-
-                <!-- Mutation marker (positioned dynamically) -->
-                <rect class="mutation-marker" id="mutation-marker" x="0" y="0" width="28" height="28" />
-
-                <!-- Mutation label -->
-                <text id="mutation-label" class="schematic-label" x="0" y="0" font-weight="700" font-size="13"></text>
-              </svg>
-              <div style="text-align:center; margin-top:8px;">
-                <span class="surface-badge" id="surface-badge"></span>
-              </div>
-            </div>
-
-            <!-- Target selector tabs -->
-            <div class="explorer-tabs" id="explorer-tabs"></div>
-
-            <!-- Mobile: static cards -->
-            <div class="explorer-static" id="explorer-static">
-              <div class="explorer-static-cards" id="explorer-static-cards"></div>
-            </div>
-
-            <!-- Explanation panel -->
-            <div class="ve-explanation-panel" id="explorer-explanation"></div>
+            <h2>Understand your top vaccine target</h2>
+            <p class="step-intro">Start with the strongest target, see why it matters, and review the evidence and limits before moving on to the full vaccine blueprint.</p>
           </div>
 
           <div id="summary-bar" class="summary-bar" hidden>
             <div id="summary-grid" class="summary-grid"></div>
           </div>
 
+          <div id="target-overview" class="target-overview empty-state">
+            Upload your data or try the demo to see why the top target stands out.
+          </div>
+
           <div id="ranking-explainer" class="ranking-explainer" hidden>
             <p class="inline-context" id="ranking-explainer-text"><strong>How we rank targets:</strong> We combine four factors — binding strength (can the immune system grab it?), tumor presence (is it common across the tumor?), gene activity (is the tumor making it?), and immune specificity (how different from normal proteins?). A good vaccine target scores well on all four.</p>
           </div>
 
+          <div id="target-primary" class="target-primary empty-state">
+            A detailed explanation of the strongest target will appear here once analysis is complete.
+          </div>
+
+          <div id="target-compare" class="target-compare empty-state">
+            Comparison cards for additional targets will appear here.
+          </div>
+
           <div id="candidate-list" class="candidate-list empty-state">
-            Upload your data or try the demo to see vaccine targets.
+            Upload your data or try the demo to compare additional targets.
           </div>
 
           <div id="raw-candidates-area" class="raw-data-area" hidden>
@@ -413,24 +288,10 @@
 
         <!-- STEP 4: Blueprint -->
         <section id="step-blueprint" class="wizard-step panel" data-step="4">
-          <!-- ═══════ Scene 4a: Construct Assembly (Visual Explorer) ═══════ -->
-          <div class="scene-container construct-scene" id="scene-construct">
-            <div class="section-heading">
-              <p class="section-kicker">Vaccine Blueprint</p>
-              <h2 class="scene-heading">The mRNA construct</h2>
-            </div>
-            <p class="scene-subheading">
-              Your targets have been assembled into a single mRNA molecule. Click any segment to learn what it does.
-            </p>
-            <div class="construct-svg-wrap" id="construct-svg-wrap">
-              <svg class="construct-viz" id="construct-viz" viewBox="0 0 900 140" aria-label="mRNA construct assembly"></svg>
-            </div>
-            <div class="construct-explanation" id="construct-explanation"></div>
-          </div>
           <div class="section-heading">
             <p class="section-kicker">Step 4</p>
-            <h2>Your vaccine blueprint</h2>
-            <p class="step-intro">A summary of what could be synthesized based on the top vaccine targets identified in your pet's tumor.</p>
+            <h2>Understand the vaccine blueprint</h2>
+            <p class="step-intro">See what this draft construct is trying to do, why the targets were assembled this way, and what to bring into a discussion with your veterinarian.</p>
             <p class="inline-context" id="blueprint-context">This follows the same basic design as modern mRNA vaccines (like COVID-19 vaccines), adapted for cancer targets. Each part of the molecule has a specific job — from protecting the mRNA to directing the immune response.</p>
           </div>
 
@@ -438,8 +299,25 @@
             The vaccine blueprint will appear after analysis is complete.
           </div>
 
-          <button id="explain-blueprint" class="explain-btn" type="button" hidden>Explain this blueprint</button>
-          <p id="blueprint-explain-response" class="explain-response" hidden></p>
+          <div id="blueprint-rationale" class="blueprint-rationale empty-state">
+            The rationale behind the construct will appear here after analysis is complete.
+          </div>
+
+          <div id="blueprint-construct" class="blueprint-construct-panel" hidden>
+            <div class="section-heading section-heading-compact">
+              <p class="section-kicker">Construct Map</p>
+              <h3>The molecule, explained part by part</h3>
+              <p class="step-intro">This interactive map is still available, but it now supports the conclusion above instead of replacing it.</p>
+            </div>
+            <div class="construct-svg-wrap" id="construct-svg-wrap">
+              <svg class="construct-viz" id="construct-viz" viewBox="0 0 900 140" aria-label="mRNA construct assembly"></svg>
+            </div>
+            <div class="construct-explanation" id="construct-explanation"></div>
+          </div>
+
+          <div id="blueprint-vetprep" class="blueprint-vetprep empty-state">
+            Vet discussion prompts and safety framing will appear here after analysis is complete.
+          </div>
 
           <div id="blueprint-actions" class="blueprint-actions" hidden>
             <div class="report-audience-selector">
@@ -481,8 +359,8 @@
         <section id="step-nextsteps" class="wizard-step panel" data-step="5">
           <div class="section-heading">
             <p class="section-kicker">Step 5</p>
-            <h2>What to do next</h2>
-            <p class="step-intro">Now that you have vaccine targets identified, here's how to move forward.</p>
+            <h2>Prepare for the vet discussion</h2>
+            <p class="step-intro">Use this page as the handoff from computational analysis to a real clinical conversation, with a report, checklist, and discussion template.</p>
           </div>
 
           <p class="inline-context" id="report-context">This report summarizes your complete analysis. Share it with your veterinarian to discuss next steps. It includes the mutation summary, ranked targets with explanations, the vaccine blueprint, and important limitations.</p>
