@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VaxAgent 5-Step Motion Draft</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./5-step-draft.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="draft-header">
+        <div>
+          <p class="eyebrow">Review Draft</p>
+          <h1>VaxAgent 5-Step Motion Story</h1>
+          <p class="lede">
+            This is a motion draft for reviewing narrative flow. It is intentionally not the production UI.
+            The goal is to check whether a general audience can follow the science as the visuals unfold.
+          </p>
+        </div>
+        <div class="draft-note">
+          <strong>Current wizard mapping</strong>
+          <span>Step 2: sequence + fragments</span>
+          <span>Step 3: fit / mismatch</span>
+          <span>Step 4: ranking + assembly</span>
+          <span>Step 5: handoff only</span>
+        </div>
+      </header>
+
+      <nav class="draft-progress" aria-label="Review steps">
+        <span>1 Diagnosis</span>
+        <span class="is-active">2 Upload</span>
+        <span class="is-active">3 Understand</span>
+        <span class="is-active">4 Blueprint</span>
+        <span class="is-active">5 Discuss</span>
+      </nav>
+
+      <section class="motion-intro">
+        <div class="motion-intro-row">
+          <p>
+            Scroll to trigger each section. Every step plays once by default, and each card has its own replay button so you can re-review the motion in isolation.
+          </p>
+          <div class="motion-controls">
+            <span id="motion-status" class="motion-status">Motion: Auto</span>
+            <button id="motion-toggle" class="motion-toggle" type="button">Force motion on</button>
+          </div>
+        </div>
+      </section>
+
+      <main class="draft-stack">
+        <section class="draft-step motion-step step-sequence" data-step="sequence">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 2A</p>
+              <h2>Scientific Step 1: Sequence / Detection</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: mutation position</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="sequence-compare">
+                <div class="sequence-row beat" data-beat-group="hero" data-motion="left">
+                  <span class="sequence-tag">Normal</span>
+                  <div class="sequence-track">
+                    <span class="shared-char">A</span><span class="shared-char">T</span><span class="shared-char">C</span><span class="shared-char">G</span><span class="shared-char">C</span><span class="mutation-mark beat" data-beat-group="transform">A</span><span class="shared-char">G</span><span class="shared-char">T</span><span class="shared-char">C</span>
+                  </div>
+                </div>
+                <div class="sequence-row beat" data-beat-group="hero" data-motion="right">
+                  <span class="sequence-tag">Tumor</span>
+                  <div class="sequence-track">
+                    <span class="shared-char">A</span><span class="shared-char">T</span><span class="shared-char">C</span><span class="shared-char">G</span><span class="shared-char">C</span><span class="mutation-mark is-mutant beat" data-beat-group="transform">T</span><span class="shared-char">G</span><span class="shared-char">T</span><span class="shared-char">C</span>
+                  </div>
+                </div>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">Show one changed position clearly. This step answers: where did the tumor sequence diverge?</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Primary copy</p>
+                <p>We compare normal and tumor sequence to locate the exact mutation that will drive the downstream search.</p>
+              </div>
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Disclosure only</p>
+                <p>Raw VCF rows, parser logs, upload mechanics.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="draft-step motion-step step-fragment" data-step="fragment">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 2B</p>
+              <h2>Scientific Step 2: Fragment Generation</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: selected peptide</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="fragment-flow">
+                <div class="sequence-window is-source beat" data-beat-group="hero">... K R M <span class="is-focus">W</span> L T E Q ...</div>
+                <div class="flow-arrow beat" data-beat-group="transform">→</div>
+                <div class="window-stack">
+                  <div class="window-card beat" data-beat-group="resolve" style="--stagger: 0;">K R M W L T E Q P</div>
+                  <div class="window-card beat" data-beat-group="resolve" style="--stagger: 1;">R M W L T E Q P A</div>
+                  <div class="window-card is-selected beat" data-beat-group="resolve" style="--stagger: 2;">M W L T E Q P A N</div>
+                  <div class="window-card beat" data-beat-group="resolve" style="--stagger: 3;">W L T E Q P A N S</div>
+                </div>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">This step answers: how does one mutation become overlapping candidate fragments, and which fragment is kept?</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Primary copy</p>
+                <p>We cut multiple overlapping fragments around the mutation and retain the mutant peptide that best preserves the altered signal.</p>
+              </div>
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Disclosure only</p>
+                <p>Sliding-window rules, fragment-length rules, technical filters.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="draft-step motion-step step-fit" data-step="fit">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 3</p>
+              <h2>Scientific Step 3: Fit / Mismatch</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: anchor fit states</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="fit-layout">
+                <div class="mhc-shell beat" data-beat-group="hero">
+                  <div class="peptide-strip">
+                    <span class="fit beat" data-beat-group="transform" style="--stagger: 0;">M</span>
+                    <span class="fit beat" data-beat-group="transform" style="--stagger: 1;">W</span>
+                    <span class="partial beat" data-beat-group="transform" style="--stagger: 2;">L</span>
+                    <span class="fit beat" data-beat-group="transform" style="--stagger: 3;">T</span>
+                    <span class="partial beat" data-beat-group="transform" style="--stagger: 4;">E</span>
+                    <span class="miss beat" data-beat-group="transform" style="--stagger: 5;">Q</span>
+                  </div>
+                </div>
+                <div class="fit-legend beat" data-beat-group="resolve">
+                  <div><span class="legend fit"></span> fit</div>
+                  <div><span class="legend partial"></span> partial</div>
+                  <div><span class="legend miss"></span> mismatch</div>
+                </div>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">This step answers: can the peptide plausibly sit in the immune receptor groove, and where does it fail?</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Primary copy</p>
+                <p>This is a conceptual groove diagram, not a realistic protein render. The goal is to make fit and mismatch legible at a glance.</p>
+              </div>
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Secondary evidence</p>
+                <p>Allele label, IC50 bucket, fold-change.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="draft-step motion-step step-ranking" data-step="ranking">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 4A</p>
+              <h2>Scientific Step 4: Ranking / Funnel</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: why the winner survives</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="funnel-frame">
+                <div class="funnel-tier wide beat" data-beat-group="hero">Many candidate peptides</div>
+                <div class="funnel-tier mid beat" data-beat-group="transform">Binding + expression + clonality + specificity</div>
+                <div class="funnel-tier narrow beat" data-beat-group="resolve">Top ranked set</div>
+              </div>
+              <div class="rank-strip">
+                <div class="rank-card is-winner beat" data-beat-group="secondary" style="--stagger: 2;">#1 TP53 R248W</div>
+                <div class="rank-card beat" data-beat-group="secondary" style="--stagger: 0;">#2 PIK3CA E545K</div>
+                <div class="rank-card beat" data-beat-group="secondary" style="--stagger: 1;">#3 BRCA1 T1685I</div>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">This step answers: why do some candidates survive prioritization while others disappear?</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Primary copy</p>
+                <p>The funnel is the story. The winner card is only there to show who remains after the filters, not to replace the funnel.</p>
+              </div>
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Disclosure only</p>
+                <p>Exact score formulas, long ranked tables, low-ranked candidates.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="draft-step motion-step step-assembly" data-step="assembly">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 4B</p>
+              <h2>Scientific Step 5: Blueprint / Assembly</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: ordered target cassette</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="assembly-row source">
+                <span class="assembly-box target beat" data-beat-group="hero" style="--stagger: 0;">#1 Target</span>
+                <span class="assembly-box target beat" data-beat-group="hero" style="--stagger: 1;">#2 Target</span>
+                <span class="assembly-box target beat" data-beat-group="hero" style="--stagger: 2;">#3 Target</span>
+              </div>
+              <div class="flow-arrow tall beat" data-beat-group="transform">↓</div>
+              <div class="assembly-row final">
+                <span class="assembly-box support beat" data-beat-group="resolve" style="--stagger: 0;">Cap</span>
+                <span class="assembly-box support beat" data-beat-group="resolve" style="--stagger: 1;">5' UTR</span>
+                <span class="assembly-box target beat" data-beat-group="resolve" style="--stagger: 2;">#1</span>
+                <span class="assembly-box linker beat" data-beat-group="resolve" style="--stagger: 3;">Linker</span>
+                <span class="assembly-box target beat" data-beat-group="resolve" style="--stagger: 4;">#2</span>
+                <span class="assembly-box linker beat" data-beat-group="resolve" style="--stagger: 5;">Linker</span>
+                <span class="assembly-box target beat" data-beat-group="resolve" style="--stagger: 6;">#3</span>
+                <span class="assembly-box support beat" data-beat-group="resolve" style="--stagger: 7;">3' UTR</span>
+                <span class="assembly-box support beat" data-beat-group="resolve" style="--stagger: 8;">Poly(A)</span>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">This step answers: how do selected targets become one draft mRNA construct?</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Primary copy</p>
+                <p>Show ordered targets first, then show how support segments wrap them into one blueprint.</p>
+              </div>
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Disclosure only</p>
+                <p>Full sequence preview, segment metadata, manufacturing caveats.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="draft-step motion-step handoff step-handoff" data-step="handoff">
+          <div class="step-heading">
+            <div>
+              <p class="eyebrow">Current Step 5</p>
+              <h2>Discuss / Handoff</h2>
+            </div>
+            <div class="step-heading-actions">
+              <span class="chip">Hero: summary for review</span>
+              <button class="replay-btn" type="button">Replay motion</button>
+            </div>
+          </div>
+          <div class="wireframe-grid">
+            <article class="wireframe-main">
+              <p class="wireframe-label beat" data-beat-group="caption">Main visual</p>
+              <div class="handoff-panel">
+                <div class="handoff-box beat" data-beat-group="secondary" style="--stagger: 0;">What was selected</div>
+                <div class="handoff-box beat" data-beat-group="secondary" style="--stagger: 1;">Why it matters</div>
+                <div class="handoff-box beat" data-beat-group="secondary" style="--stagger: 2;">Limits and questions for the vet</div>
+              </div>
+              <p class="wireframe-copy beat" data-beat-group="caption">This is a discussion page only. It should summarize and hand off, not introduce new core science visuals.</p>
+            </article>
+            <aside class="wireframe-side">
+              <div class="side-card beat" data-beat-group="secondary">
+                <p class="wireframe-label">Review checkpoint</p>
+                <p>If this page feels like a new science step, the flow is wrong.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./5-step-draft.js"></script>
+  </body>
+</html>
